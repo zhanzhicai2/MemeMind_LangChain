@@ -4,5 +4,233 @@
 @IDE ：PyCharm
 @Author ：zhanzhicai
 @Date ：2025/10/31 18:14
-@DOC: 
+@DOC: Pydantic数据模式定义模块
+
+该模块定义了应用程序中使用的所有Pydantic数据模式，用于：
+- API请求和响应的数据验证
+- 数据序列化和反序列化
+- 自动生成API文档
+- 数据类型验证和约束检查
+
+包含的主要模式：
+- BaseSchema: 基础模式配置
+- UserSchema: 用户相关模式
+- Attachment相关模式: 文件附件处理模式
+- PresignedUrlResponse: 预签名URL响应模式
 """
+
+# 导入日期时间模块，用于处理时间戳字段
+from datetime import datetime
+
+# 导入Pydantic相关组件：
+# BaseModel: 所有Pydantic模式的基类
+# ConfigDict: 模式配置类，用于配置模型行为
+# Field: 字段定义装饰器，用于添加验证规则和元数据
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# 配置基类：启用 ORM 模式，支持从数据库模型创建Pydantic模型
+class BaseSchema(BaseModel):
+    # 配置模型允许从属性（ORM模型字段）创建实例
+    # from_attributes=True 允许从SQLAlchemy模型直接创建Pydantic模型
+    model_config = ConfigDict(from_attributes=True)
+
+
+# 用户数据模式：定义用户相关数据的结构和验证规则
+class UserSchema(BaseSchema):
+    # 用户ID：整数类型，必填字段
+    id: int  # 对应数据库中的用户主键ID
+
+    # 用户名：字符串类型，必填字段，包含长度验证
+    username: str = Field(
+        ...,  # 省略号表示必填字段
+        min_length=3,  # 最小长度3个字符
+        max_length=100,  # 最大长度100个字符
+        description="用户登录名，必须唯一"  # 字段描述，用于API文档生成
+    )
+
+    # 用户全名：可选的字符串类型，可以为空
+    full_name: str | None = Field(
+        None,  # 默认值为None，表示可选字段
+        min_length=3,  # 如果提供，最小长度3个字符
+        max_length=100,  # 如果提供，最大长度100个字符
+        description="用户真实姓名，可选字段"  # 字段描述
+    )
+
+    # 创建时间：日期时间类型，可选字段
+    created_at: datetime = Field(
+        None,  # 默认值为None
+        description="用户账户创建时间，UTC时间戳"  # 字段描述
+    )
+
+    # 更新时间：日期时间类型，可选字段
+    updated_at: datetime = Field(
+        None,  # 默认值为None
+        description="用户信息最后更新时间，UTC时间戳"  # 字段描述
+    )
+
+
+# 用户响应模式：用于API返回用户数据，继承自UserSchema
+class UserResponse(UserSchema):
+    pass  # 继承UserSchema的所有字段，无需额外定义
+
+
+# 用户更新模式：用于用户信息更新请求，只包含可更新的字段
+class UserUpdateSchema(BaseSchema):
+    # 用户名：字符串类型，必填字段，包含长度验证
+    username: str = Field(
+        ...,  # 必填字段，更新时必须提供用户名
+        min_length=3,  # 最小长度3个字符
+        max_length=100,  # 最大长度100个字符
+        description="新的用户名"  # 字段描述
+    )
+
+    # 用户全名：可选的字符串类型，可以为空
+    full_name: str | None = Field(
+        None,  # 可选字段，不更新全名时可以省略
+        min_length=3,  # 如果提供，最小长度3个字符
+        max_length=100,  # 如果提供，最大长度100个字符
+        description="新的用户全名"  # 字段描述
+    )
+
+
+# 附件基础模式：定义附件数据的基本结构和验证规则
+class SourceDocumentBase(BaseSchema):
+    # MinIO对象名称：字符串类型，必填字段
+    object_name: str = Field(
+        ...,  # 必填字段
+        max_length=512,  # 最大长度512个字符，支持复杂的对象路径
+        description="MinIO对象存储中的唯一标识符路径，例如：'documents/2024/report.pdf'"  # 详细描述
+    )
+
+    # MinIO存储桶名称：字符串类型，必填字段
+    bucket_name: str = Field(
+        ...,  # 必填字段
+        max_length=100,  # 最大长度100个字符
+        description="MinIO存储桶名称，例如：'mememind-documents'或'user-uploads'"  # 存储桶用途说明
+    )
+
+    # 原始文件名：字符串类型，必填字段
+    original_filename: str = Field(
+        ...,  # 必填字段
+        max_length=255,  # 最大长度255个字符，符合大多数文件系统限制
+        description="用户上传时的原始文件名，包含扩展名，例如：'年度报告.pdf'"  # 文件名说明
+    )
+
+    # 文件内容类型：字符串类型，必填字段
+    content_type: str = Field(
+        ...,  # 必填字段
+        max_length=100,  # 最大长度100个字符
+        description="文件的MIME类型，用于标识文件格式，例如：'application/pdf'或'image/jpeg'"  # MIME类型说明
+    )
+
+    # 文件大小：整数类型，必填字段
+    size: int = Field(
+        ...,  # 必填字段
+        description="文件大小，以字节为单位，例如：1024表示1KB"  # 大小单位说明
+    )
+
+
+class SourceDocumentCreate(SourceDocumentBase):
+    pass
+
+
+# 创建附件时的请求模型：继承自AttachmentBase，用于文件上传请求
+class SourceDocumentUpdate(BaseSchema):
+    status: str | None = Field(
+        ...,
+        description="文件状态"
+    )
+    processed_at: datetime | None = Field(
+        ...,
+        description="处理时间"
+    )
+    error_message: str | None = Field(
+        ...,
+        description="错误信息"
+    )
+    number_of_chunks: int | None = Field(
+        ...,
+        description="分块数量"
+    )
+
+
+# 附件响应模型：用于API返回附件的完整信息，包含数据库字段
+class SourceDocumentResponse(SourceDocumentBase):
+    # 附件ID：整数类型，必填字段
+    id: int = Field(
+        ...,  # 必填字段
+        description="数据库中的附件主键ID，用于唯一标识附件记录"  # ID用途说明
+    )
+
+    owner_id: int | None = Field(
+        ...,
+        description="所属用户ID"
+    )
+    status: str = Field(
+        ...,
+        description="文件状态"
+    )
+    processed_at: datetime | None = Field(
+        ...,
+        description="处理时间"
+    )
+    error_message: str | None = Field(
+        ...,
+        description="错误信息"
+    )
+    number_of_chunks: int | None = Field(
+        ...,
+        description="分块数量"
+    )
+
+    # 创建时间：日期时间类型，必填字段
+    created_at: datetime = Field(
+        ...,  # 必填字段
+        description="附件记录创建时间，UTC时间戳格式"  # 创建时间说明
+    )
+
+    # 更新时间：日期时间类型，必填字段
+    updated_at: datetime = Field(
+        ...,  # 必填字段
+        description="附件记录最后更新时间，UTC时间戳格式"  # 更新时间说明
+    )
+
+
+# 预签名URL响应模式：用于返回MinIO预签名上传URL的响应数据
+class PresignedUrlResponse(BaseModel):
+    # 预签名URL：字符串类型，必填字段
+    url: str = Field(
+        ...,  # 必填字段
+        description="MinIO生成的预签名URL，用于直接上传文件到对象存储，包含签名信息和过期时间"  # URL用途详细说明
+    )
+
+    # 附件ID：整数类型，必填字段
+    attachment_id: int = Field(
+        ...,  # 必填字段
+        description="数据库中的附件记录ID，用于关联上传完成后的文件信息"  # ID关联说明
+    )
+
+    # 附件大小：整数类型，必填字段
+    size: int = Field(
+        ...,  # 必填字段
+        description="预期的文件大小（字节），用于在上传时验证文件大小是否匹配"  # 大小验证说明
+    )
+
+    # 文件内容类型：字符串类型，必填字段
+    content_type: str = Field(
+        ...,  # 必填字段
+        description="文件的MIME类型，用于在上传时设置正确的Content-Type头部"  # MIME类型用途说明
+    )
+
+    # 文件名：字符串类型，必填字段
+    filename: str = Field(
+        ...,  # 必填字段
+        description="原始文件名，用于在前端显示和后续文件管理"  # 文件名用途说明
+    )
+
+    # URL过期时间：日期时间类型，必填字段
+    expires_at: datetime = Field(
+        ...,  # 必填字段
+        description="预签名URL的过期时间，超过此时间URL将失效，通常设置为短期有效（如15分钟）"  # 过期时间说明
+    )
