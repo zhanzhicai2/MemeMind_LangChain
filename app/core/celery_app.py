@@ -118,3 +118,6 @@ def get_task_info(task_name: str) -> dict:
             'result': None, # 任务结果，初始为空
             'error': str(e) # 任务错误信息，初始为异常信息
         }
+
+
+# uv run celery -A app.core.celery_app worker --loglevel=info --pool=threads -Q celery,document_queue,query_processing,text_chunking --autoscale=4,2

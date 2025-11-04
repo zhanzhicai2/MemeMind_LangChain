@@ -333,10 +333,10 @@ class SourceDocumentService:
             self,
             document_id: int,  # 参数：文档ID，要更新的文档标识符
             current_user: UserResponse | None, # 当前用户参数
-            status: str | None,  # 参数：文档状态，如"processing"、"completed"、"failed"
-            processed_at: datetime | None,  # 参数：处理完成时间，UTC时间戳
-            number_of_chunks: int | None,  # 参数：文本分块数量，文档被分割的块数
-            error_message: str | None,  # 参数：错误信息，处理失败时的详细描述
+            status: str | None=None,  # 参数：文档状态，如"processing"、"completed"、"failed"
+            processed_at: datetime | None=None,  # 参数：处理完成时间，UTC时间戳
+            number_of_chunks: int | None=None,  # 参数：文本分块数量，文档被分割的块数
+            error_message: str | None=None,  # 参数：错误信息，处理失败时的详细描述
             set_processed_now: bool = False,  # 参数：便捷标志，是否自动设置处理时间为当前时间
 
     ) -> SourceDocumentResponse:  # 返回值：更新后的文档响应对象
