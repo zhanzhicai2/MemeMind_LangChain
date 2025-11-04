@@ -43,7 +43,7 @@ from MemeMind_LangChain.app.source_doc.service import SourceDocumentService  # �
 # 获取当前模块的日志记录器实例
 logger = get_logger(__name__)  # 用于记录路由操作的日志信息
 # 创建API路由器实例，设置前缀和标签
-router = APIRouter(prefix="/document", tags=["Document"])  # 所有文档相关路由的前缀为/document，用于API文档分组
+router = APIRouter(prefix="/documents", tags=["Documents"])  # 所有文档相关路由的前缀为/document，用于API文档分组
 
 
 # 依赖注入函数：获取文档服务实例
@@ -66,7 +66,7 @@ def get_document_service(
     status_code=status.HTTP_201_CREATED,  # HTTP状态码：201表示创建成功
     summary="Upload Document",  # API文档中的操作摘要
 )
-async def upload_document(  # 异步函数：上传文档
+async def upload_document_route(  # 异步函数：上传文档
         file: Annotated[  # 文件参数，使用Annotated添加元数据
             UploadFile, File(..., title="Source Document", description="Upload a file")  # 文件上传对象，必填，设置标题和描述
         ],
@@ -88,7 +88,7 @@ async def upload_document(  # 异步函数：上传文档
     response_class=StreamingResponse,  # 响应类型：流式响应，用于文件下载
     summary="Download document",  # API文档中的操作摘要
 )
-async def download_attachment(  # 异步函数：下载文档（函数名与路由不匹配，建议统一命名）
+async def download_attachment_route(  # 异步函数：下载文档（函数名与路由不匹配，建议统一命名）
         document_id: int,  # 参数：文档ID，从URL路径获取
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
         # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
@@ -105,11 +105,11 @@ async def download_attachment(  # 异步函数：下载文档（函数名与路�
 
 # 文档删除路由端点：DELETE /document/{attachment_id}
 @router.delete(
-    "/{attachment_id}",  # 路径使用attachment_id命名（建议统一为document_id）
+    "/{document_id}",  # document_id（建议统一为document_id）
     status_code=status.HTTP_204_NO_CONTENT,  # HTTP状态码：204表示成功删除且无返回内容
     summary="Delete an document",  # API文档中的操作摘要
 )
-async def delete_attachment(  # 异步函数：删除文档（函数名建议统一为delete_document）
+async def delete_attachment_route(  # 异步函数：删除文档（函数名建议统一为delete_document）
         document_id: int,  # 参数：文档ID，但路由使用attachment_id（命名不一致问题）
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
         # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
@@ -129,7 +129,7 @@ async def delete_attachment(  # 异步函数：删除文档（函数名建议统
     summary="Get all documents Info",  # API文档中的操作摘要
 )
 async def get_all_documents(  # 异步函数：获取所有文档
-        params: Annotated[DocumentQueryParams, Query()],  # 查询参数，包含分页、排序等
+        params: DocumentQueryParams = Depends(),  # 查询参数，包含分页、排序等
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
         # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
 ) -> list[SourceDocumentResponse]:  # 返回值：文档响应对象列表
@@ -140,10 +140,10 @@ async def get_all_documents(  # 异步函数：获取所有文档
             offset=params.offset,  # 分页偏移量（跳过的文档数量）
             current_user=None,  # 当前用户为None
         )
-        logger.info(f"Retrieved {len(all_documents)} attachments")  # 记录查询成功的日志，注意使用了attachments命名
+        logger.info(f"Retrieved {len(all_documents)} documents")  # 记录查询成功的日志，注意使用了attachments命名
         return all_documents  # 返回文档列表给客户端
     except Exception as e:  # 捕获所有异常
-        logger.error(f"Failed to fetch all attachments: {str(e)}")  # 记录查询失败的错误日志
+        logger.error(f"Failed to fetch all documents: {str(e)}")  # 记录查询失败的错误日志
         raise  # 重新抛出异常，让FastAPI处理HTTP错误响应
 
 

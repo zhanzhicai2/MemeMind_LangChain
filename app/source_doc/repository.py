@@ -25,7 +25,7 @@ from MemeMind_LangChain.app.core.exceptions import AlreadyExistsException, NotFo
 from MemeMind_LangChain.app.models.models import SourceDocument  # 源文档数据模型
 
 # 导入数据模式
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate  # 文档数据模式
+from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate,UserResponse  # 文档数据模式
 
 
 # 源文档数据仓库类：提供数据库操作接口
@@ -35,7 +35,7 @@ class SourceDocumentRepository:
         self.session = session  # 存储数据库会话实例，用于执行数据库操作
 
     # 异步方法：创建新的文档记录
-    async def create(self, data: SourceDocumentCreate, current_user: dict | None) -> SourceDocument:  # 参数：创建数据，当前用户，返回值：文档对象
+    async def create(self, data: SourceDocumentCreate, current_user: UserResponse | None) -> SourceDocument:  # 参数：创建数据，当前用户，返回值：文档对象
         """
         创建一个新的文档记录
         :param data: 文档创建数据
@@ -65,7 +65,7 @@ class SourceDocumentRepository:
             # 抛出已存在异常
             raise AlreadyExistsException(f"源文档{data.object_name} 已存在")  # 抛出自定义异常
 
-    async def get_by_id(self, document_id: int, current_user: dict | None) -> SourceDocument:
+    async def get_by_id(self, document_id: int, current_user: UserResponse | None) -> SourceDocument:
         """
         更新文档记录
         :param document_id:
@@ -80,19 +80,18 @@ class SourceDocumentRepository:
         if not document:
             raise NotFoundException(f"文档{document_id} 不存在")
         return document
-    async def get_by_id_internal(self, document_id, current_user) -> SourceDocument:
-        """
-        获取文档记录
-        :param document_id:
-        :param current_user: 当前用户
-        :return: 文档记录
-        """
-        query = select(SourceDocument).where(SourceDocument.id == document_id)
-        result = await self.session.scalars(query)
-        document = result.one_or_none()
-        if not document:
-            raise NotFoundException(f"SourceDocument with id {document_id} not found")
-        return document
+    # async def get_by_id_internal(self, document_id) -> SourceDocument:
+    #     """
+    #     获取文档记录
+    #     :param document_id:
+    #     :return: 文档记录
+    #     """
+    #     query = select(SourceDocument).where(SourceDocument.id == document_id)
+    #     result = await self.session.scalars(query)
+    #     document = result.one_or_none()
+    #     if not document:
+    #         raise NotFoundException(f"SourceDocument with id {document_id} not found")
+    #     return document
 
     # 异步方法：获取所有文档列表
     async def get_all(
@@ -100,7 +99,7 @@ class SourceDocumentRepository:
             limit: int,  # 参数：限制数量
             offset: int,  # 参数：偏移量
             order_by: str | None,  # 参数：排序字段
-            current_user: dict | None,  # 参数：当前用户
+            current_user: UserResponse | None,  # 参数：当前用户
     ) -> list[SourceDocument]:  # 返回值：文档对象列表
         # 构建基础查询
         query = select(SourceDocument)
@@ -123,10 +122,12 @@ class SourceDocumentRepository:
 
     # 异步方法：更新文档记录
     async def update(
-            self, data: SourceDocumentUpdate, document_id: int) -> SourceDocument:  # 参数：更新数据，文档ID，返回值：更新后的文档对象
+            self, data: SourceDocumentUpdate, document_id: int,current_user: UserResponse | None) -> SourceDocument:  # 参数：更新数据，文档ID，返回值：更新后的文档对象
 
         # 构建查询条件
         query = select(SourceDocument).where(SourceDocument.id == document_id)  # 查询指定ID的文档
+        if current_user:  # 仅当 current_user 存在时添加 owner_id 过滤
+            query = query.where(SourceDocument.owner_id == current_user.id)  # 仅查询当前用户的文档
         # 执行查询
         result = await self.session.scalars(query)  # 执行标量查询
         # 获取文档对象
@@ -154,7 +155,7 @@ class SourceDocumentRepository:
         return document  # 返回更新后的文档对象
 
     # 异步方法：删除文档记录
-    async def delete(self, document_id: int, current_user: dict | None) -> None:  # 参数：文档ID，当前用户，无返回值
+    async def delete(self, document_id: int, current_user: UserResponse | None) -> None:  # 参数：文档ID，当前用户，无返回值
         try:
             # 通过ID获取文档
             document = await self.session.get(SourceDocument, document_id)  # 从数据库获取文档对象

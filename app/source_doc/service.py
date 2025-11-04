@@ -41,10 +41,11 @@ from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepositor
 
 # 导入数据模式
 from MemeMind_LangChain.app.schemas.schemas import (  # Pydantic数据模式
-    SourceDocumentCreate,    # 文档创建模式
-    SourceDocumentUpdate,    # 文档更新模式
+    SourceDocumentCreate,  # 文档创建模式
+    SourceDocumentUpdate,  # 文档更新模式
     SourceDocumentResponse,  # 文档响应模式
-    PresignedUrlResponse,    # 预签名URL响应模式
+    PresignedUrlResponse,  # 预签名URL响应模式
+    UserResponse,  # 用户响应模式
 )
 
 # 获取当前模块的日志记录器实例
@@ -61,9 +62,9 @@ class SourceDocumentService:
 
     # 异步方法：添加文档到系统
     async def add_document(
-            self, file: UploadFile, current_user: dict | None  # 参数：上传的文件对象，当前用户信息
+            self, file: UploadFile, current_user: UserResponse | None  # 参数：上传的文件对象，当前用户信息
     ) -> SourceDocumentResponse:  # 返回值：创建的文档响应对象
-              # ===== 1. 文件元数据处理,从 UploadFile 获取文件元数据 =====
+        # ===== 1. 文件元数据处理,从 UploadFile 获取文件元数据 =====
         # 获取原始文件名，如果没有文件名则生成一个UUID名称
         original_filename = file.filename or f"unnamed_{uuid.uuid4()}"  # 确保文件名不为空
         # 获取文件MIME类型，如果没有则使用默认二进制类型
@@ -164,9 +165,9 @@ class SourceDocumentService:
                 status_code=500, detail=f"Failed to save document: {str(e)}"  # 500内部服务器错误
             )
 
-      # 异步方法：获取单个文档
+    # 异步方法：获取单个文档
     async def get_document(
-            self, document_id: int, current_user: dict | None  # 参数：文档ID，当前用户
+            self, document_id: int, current_user: UserResponse | None  # 参数：文档ID，当前用户
     ) -> SourceDocumentResponse:  # 返回值：文档响应对象
         # 从数据库获取文档
         document = await self.repository.get_by_id(document_id, current_user)  # 调用仓库获取方法
@@ -179,7 +180,7 @@ class SourceDocumentService:
             order_by: str | None,  # 参数：排序字段
             limit: int,  # 参数：限制数量
             offset: int,  # 参数：偏移量
-            current_user: dict | None,  # 参数：当前用户
+            current_user: UserResponse | None,  # 参数：当前用户
     ) -> list[SourceDocumentResponse]:  # 返回值：文档响应对象列表
         # 从数据库获取文档列表
         documents = await self.repository.get_all(  # 调用仓库获取所有文档
@@ -194,7 +195,7 @@ class SourceDocumentService:
         ]
 
     # 异步方法：删除文档
-    async def delete_document(self, document_id: int, current_user: dict | None) -> None:  # 参数：文档ID，当前用户，无返回值
+    async def delete_document(self, document_id: int, current_user: UserResponse | None) -> None:  # 参数：文档ID，当前用户，无返回值
         # 先删除数据库记录
         document = await self.get_document(  # 获取文档信息
             document_id=document_id, current_user=current_user  # 文档ID和用户
@@ -226,7 +227,7 @@ class SourceDocumentService:
             )
 
     # 异步方法：下载文档文件
-    async def download_document(self, document_id: int, current_user: dict | None):  # 参数：文档ID，当前用户，返回值：流式响应对象
+    async def download_document(self, document_id: int, current_user: UserResponse | None):  # 参数：文档ID，当前用户，返回值：流式响应对象
         # 获取文档信息，验证用户权限
         document = await self.get_document(  # 调用get_document方法验证权限
             document_id=document_id,  # 文档ID参数
@@ -278,7 +279,7 @@ class SourceDocumentService:
 
     # 异步方法：获取预签名URL
     async def get_presigned_url(
-            self, document_id: int, current_user : dict | None # 参数：文档ID，当前用户
+            self, document_id: int, current_user: UserResponse | None  # 参数：文档ID，当前用户
     ) -> PresignedUrlResponse:  # 返回值：预签名URL响应对象
         # 获取文档信息，验证用户权限
         document = await self.get_document(  # 调用get_document方法验证权限
@@ -331,11 +332,13 @@ class SourceDocumentService:
     async def update_document_processing_info(
             self,
             document_id: int,  # 参数：文档ID，要更新的文档标识符
-            status: Optional[str] = None,  # 参数：文档状态，如"processing"、"completed"、"failed"
-            processed_at: Optional[datetime] = None,  # 参数：处理完成时间，UTC时间戳
-            number_of_chunks: Optional[int] = None,  # 参数：文本分块数量，文档被分割的块数
-            error_message: Optional[str] = None,  # 参数：错误信息，处理失败时的详细描述
+            current_user: UserResponse | None, # 当前用户参数
+            status: str | None,  # 参数：文档状态，如"processing"、"completed"、"failed"
+            processed_at: datetime | None,  # 参数：处理完成时间，UTC时间戳
+            number_of_chunks: int | None,  # 参数：文本分块数量，文档被分割的块数
+            error_message: str | None,  # 参数：错误信息，处理失败时的详细描述
             set_processed_now: bool = False,  # 参数：便捷标志，是否自动设置处理时间为当前时间
+
     ) -> SourceDocumentResponse:  # 返回值：更新后的文档响应对象
 
         # 确定最终的 processed_at 时间值
@@ -354,7 +357,7 @@ class SourceDocumentService:
         try:  # 尝试执行数据库更新操作
             # 调用仓库层更新文档记录
             updated_document = await self.repository.update(  # 执行数据库更新
-                data=update_payload, document_id=document_id  # 更新数据和文档ID
+                data=update_payload, document_id=document_id, current_user=current_user  # 更新数据和文档ID
             )
             # 记录成功更新的日志
             logger.info(f"成功更新文档 ID: {document_id} 的处理信息")  # 记录操作成功信息
