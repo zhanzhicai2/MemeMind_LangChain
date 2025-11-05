@@ -11,7 +11,7 @@ from pathlib import Path
 from transformers import AutoTokenizer, AutoModel
 import torch  # PyTorch 是 Transformers 的依赖之一
 
-from MemeMind_LangChain.app.core.logging import get_logger
+from loguru import logger
 
 # 在线模型
 EMBEDDING_MODEL_NAME = "maidalun1020/bce-embedding-base_v1" # 嵌入模型名称
@@ -26,7 +26,7 @@ tokenizer =None # 分词器
 embedding_model_global = None  # 使用 embedding_model_global 以区分局部变量
 device = None # 设备
 
-logger = get_logger(__name__)
+
 
 def _load_embedding_model():
     """延迟加载 Embedding 模型和 Tokenizer，并移至可用设备。"""

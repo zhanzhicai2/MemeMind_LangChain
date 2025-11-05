@@ -8,13 +8,12 @@
 """
 import asyncio
 
-from MemeMind_LangChain.app.core import get_logger
+from loguru import logger
+from MemeMind_LangChain.core.config import settings
 from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
 from MemeMind_LangChain.app.core.embedding import get_embeddings
 from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
-
-logger = get_logger(__name__)
 
 
 class QueryService:
@@ -40,8 +39,7 @@ class QueryService:
             embeddings_list = await asyncio.to_thread(
                 get_embeddings,  # 同步函数
                 [query_text],  # 作为单元素列表传入
-                # instruction=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL # 从配置中获取指令
-                instruction=""
+                instruction=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL  # 从配置中获取指令
             )
             if not embeddings_list:
                 logger.error(f"查询文本 '{query_text}' 的向量化结果为空。")
@@ -72,7 +70,10 @@ class QueryService:
             results = chroma_collection.query(
                 query_embeddings=[query_embedding],  # 查询向量
                 n_results=top_k,
-                include=["metadatas", "distances"]  # metadatas 可能包含 text_chunk_db_id，distances 用于调试或排序
+                include=[
+                    "metadatas",
+                    "distances"
+                ]  # metadatas 可能包含 text_chunk_db_id，distances 用于调试或排序
             )
             return results
 
@@ -147,7 +148,9 @@ class QueryService:
             if chunk_responses:
                 id_to_chunk_map = {chunk.id: chunk for chunk in chunk_responses}  # 创建 ID 到 TextChunkResponse 的映射
                 ordered_responses = [
-                    id_to_chunk_map[pg_id] for pg_id in relevant_chunk_pg_ids if pg_id in id_to_chunk_map
+                    id_to_chunk_map[pg_id]
+                    for pg_id in relevant_chunk_pg_ids
+                    if pg_id in id_to_chunk_map
                 ]  # 根据 ChromaDB ID 顺序重新排序
                 if len(ordered_responses) != len(chunk_responses):
                     logger.warning("重新排序后，文本块数量与从数据库获取的数量不一致，可能存在ID丢失或重复。")

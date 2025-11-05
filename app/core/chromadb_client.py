@@ -7,9 +7,10 @@
 @DOC: 创建 ChromaDB 客户端
 """
 from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.logging import get_logger
+from loguru import logger
+import chromadb  # 导入 ChromaDB 客户端库
 
-logger = get_logger(__name__) # 创建 ChromaDB 客户端日志记录器
+ # 创建 ChromaDB 客户端日志记录器
 chroma_client = None # ChromaDB 客户端实例
 
 
@@ -26,7 +27,6 @@ def get_chroma_collection():
             # 如果 Celery worker 运行在宿主机，则使用宿主机IP/localhost 和映射的端口 5500
             # settings.CHROMA_HTTP_ENDPOINT = "http://localhost:5500"
 
-            import chromadb # 导入 ChromaDB 客户端库
             chroma_client = chromadb.HttpClient(settings.CHROMA_HTTP_ENDPOINT) # 创建 ChromaDB 客户端实例
             logger.info(f"ChromaDB 客户端已连接到: {settings.CHROMA_HTTP_ENDPOINT}") # 记录 ChromaDB 客户端连接信息
         except Exception as e:

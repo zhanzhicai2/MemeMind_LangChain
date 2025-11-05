@@ -6,20 +6,19 @@
 @Date ：2025/11/5 11:35
 @DOC: 
 """
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from MemeMind_LangChain.app.core.database import get_db
-from MemeMind_LangChain.app.core.logging import get_logger
+from loguru import logger
 from MemeMind_LangChain.app.query.service import QueryService
 from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
 from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 
-logger = get_logger(__name__)
+
 
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
 
@@ -34,7 +33,7 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
 
-@router.post("/retrieve-chunks", response_model=List[TextChunkResponse])
+@router.post("/retrieve-chunks", response_model=list[TextChunkResponse])
 async def retrieve_chunks_for_query(
         request_data: QueryRequest, # 使用请求体,
         query_service: QueryService = Depends(get_query_service)):

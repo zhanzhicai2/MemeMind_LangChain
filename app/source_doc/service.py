@@ -30,7 +30,7 @@ import uuid  # UUID生成器，用于生成唯一标识符
 from datetime import datetime, timedelta, timezone  # 日期时间处理
 
 # 导入应用核心模块
-from MemeMind_LangChain.app.core.logging import get_logger  # 日志记录器
+from loguru import logger  # 日志记录器
 from MemeMind_LangChain.app.core.config import settings  # 应用配置
 from MemeMind_LangChain.app.core.s3_client import s3_client  # MinIO S3客户端
 from MemeMind_LangChain.app.core.celery_app import celery_app  # Celery异步任务队列
@@ -48,8 +48,8 @@ from MemeMind_LangChain.app.schemas.schemas import (  # Pydantic数据模式
     UserResponse,  # 用户响应模式
 )
 
-# 获取当前模块的日志记录器实例
-logger = get_logger(__name__)
+
+
 
 
 # 源文档服务类：提供文档管理的业务逻辑

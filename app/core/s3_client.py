@@ -19,11 +19,11 @@ from MemeMind_LangChain.app import settings
 # 导入自定义异常类，处理权限相关错误
 from MemeMind_LangChain.app.core.exceptions import ForbiddenException
 # 导入日志记录器，用于记录操作日志
-from MemeMind_LangChain.app.core.logging import get_logger
+from loguru import logger
 # 导入AWS客户端配置类，用于配置S3客户端参数
 from botocore.client import Config
 
-logger = get_logger(__name__)
+
 
 # 创建全局S3客户端实例，用于MinIO对象存储操作
 s3_client = boto3.client(

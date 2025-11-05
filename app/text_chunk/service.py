@@ -6,13 +6,10 @@
 @Date ：2025/11/4 18:12
 @DOC: 
 """
-from MemeMind_LangChain.app.core.logging import get_logger
 from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
 from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate, TextChunkResponse
+from loguru import logger
 
-
-# Set up logger for this module
-logger = get_logger(__name__)
 
 
 class TextChunkService:

@@ -21,6 +21,7 @@ from docutils.nodes import status  # 文档处理节点状态（实际未使用�
 
 # 导入FastAPI相关组件
 from fastapi import APIRouter, Query  # API路由器和查询参数
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession  # 异步数据库会话
 from fastapi import Depends, status  # 依赖注入和HTTP状态码
 from fastapi.responses import FileResponse  # 文件响应（未使用，可考虑移除）
@@ -40,8 +41,6 @@ from MemeMind_LangChain.app.schemas.param_schemas import DocumentQueryParams  # 
 from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepository  # 文档数据仓库
 from MemeMind_LangChain.app.source_doc.service import SourceDocumentService  # 文档服务层
 
-# 获取当前模块的日志记录器实例
-logger = get_logger(__name__)  # 用于记录路由操作的日志信息
 # 创建API路由器实例，设置前缀和标签
 router = APIRouter(prefix="/documents", tags=["Documents"])  # 所有文档相关路由的前缀为/document，用于API文档分组
 

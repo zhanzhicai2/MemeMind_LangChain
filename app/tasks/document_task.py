@@ -4,11 +4,10 @@ import asyncio
 # import redis
 from asgiref.sync import async_to_sync
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
+from loguru import logger
 from MemeMind_LangChain.app import settings
 from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
 from MemeMind_LangChain.app.core.embedding import get_embeddings
-from MemeMind_LangChain.app.core.logging import get_logger
 from MemeMind_LangChain.app.core.celery_app import celery_app
 from MemeMind_LangChain.app.core.s3_client import s3_client
 from MemeMind_LangChain.app.core.database import SessionLocal
@@ -19,7 +18,6 @@ from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate, SourceDocumentResponse
 
-logger = get_logger(__name__)
 
 # redis_host = os.getenv("REDIS_HOST", "localhost:6379")
 # REDIS_URL = f"redis://{redis_host}/0"

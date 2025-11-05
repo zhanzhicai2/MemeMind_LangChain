@@ -25,10 +25,9 @@ from botocore.exceptions import ClientError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 导入应用日志记录器，用于记录迁移操作日志
-from MemeMind_LangChain.app.core.logging import get_logger
+from loguru import logger
 
-# 获取当前模块的日志记录器实例，用于记录迁移过程中的各种信息
-logger = get_logger(__name__)
+
 
 
 def run_migrations() -> Optional[bool]:
