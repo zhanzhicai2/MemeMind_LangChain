@@ -1,0 +1,16 @@
+services:
+  chromadb:
+    image: chromadb/chroma
+    container_name: ChromaDB
+    ports:
+      - "5500:8000"  # 将容器内8000映射到宿主机5500
+    environment:
+      - IS_PERSISTENT=TRUE  # 启用持久化
+      - CHROMA_SERVER_HOST=0.0.0.0 # 允许所有IP访问容器内的8000端口
+    volumes:
+      - data:/chroma/chroma  # 数据持久化卷，'data' 是Docker volume的名称
+    restart: unless-stopped
+
+volumes:
+  data: # 定义Docker volume
+    driver: local
