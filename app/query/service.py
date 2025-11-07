@@ -132,7 +132,8 @@ class QueryService:
         # 2. 在向量数据库中搜索相关文本块的ID
         try:
             # 使用配置中定义的较大 top_k进行初步召回
-            candidate_chunk_pg_ids = await self._search_vector_db_async(query_embedding, top_k=settings.INITIAL_RETRIEVAL_TOP_K)
+            candidate_chunk_pg_ids = await self._search_vector_db_async(query_embedding,
+                                                                        top_k=settings.INITIAL_RETRIEVAL_TOP_K)
         except ValueError as e:
             logger.error(f"ChromaDB 向量检索失败: {e}")
             return []  # 或者可以向上抛出 HTTPException
@@ -144,14 +145,14 @@ class QueryService:
         # 3. 使用这些ID从 PostgreSQL 中获取完整的文本块详情
         try:
             # text_chunk_service.get_chunks_by_ids 返回 List[TextChunkResponse]
-            candidate_chunks:list[TextChunkResponse] = await self.text_chunk_service.get_chunks_by_ids(chunk_ids=candidate_chunk_pg_ids)
+            candidate_chunks: list[TextChunkResponse] = await self.text_chunk_service.get_chunks_by_ids(
+                chunk_ids=candidate_chunk_pg_ids)
             logger.info(f"成功从 PostgreSQL 检索到 {len(candidate_chunks)} 个相关文本块。")
         except Exception as e:
             logger.error(
                 f"从 PostgreSQL 获取候选文本块详情时发生错误: {e}", exc_info=True
             )
             return []
-
 
         if not candidate_chunks:
             logger.info("未能从数据库获取候选文本块内容，尽管已召回ID。")
@@ -181,7 +182,7 @@ class QueryService:
             logger.error(f"Reranking 过程中发生错误: {e}", exc_info=True)
             # 如果 Rerank 失败，是返回初步召回的结果还是空列表？通常可能是空列表或抛出异常
             # 这里我们选择返回空列表，或者你可以选择返回 initial_retrieved_chunks 的前N个作为降级方案
-            return []# 或者向上抛出 HTTPException
+            return []  # 或者向上抛出 HTTPException
 
     async def get_context_for_llm(self, query_text: str) -> list[str]:
         """
@@ -222,7 +223,8 @@ class QueryService:
             llm_top_p: float = 0.9,
     ) -> dict[str, Any]:  # 返回包含答案和可能上下文的字典
         """
-        从查询文本生成最终答案。
+        处理用户查询，检索上下文，并调用LLM生成答案。
+        这个版本优化了错误处理和返回路径，确保数据结构的一致性。
         :param query_text: 用户输入的查询文本
         :param llm_max_tokens: LLM 最大生成 token 数
         :param llm_temperature: LLM 温度参数，控制生成的随机性
@@ -230,39 +232,44 @@ class QueryService:
         :return: 包含答案和上下文的字典
         """
         logger.info(f"开始为查询生成答案: '{query_text[:100]}...'")
-        # 1. 从查询文本中获取上下文文本
-        context_strings: list[str] = await self.get_context_for_llm(query_text)
-
-        if not context_strings:
-            logger.warning("未获取到任何上下文文本，无法生成答案。")
-
-            # 策略1：直接返回无上下文提示
-            # return {"answer": "抱歉，未能找到与您问题相关的具体信息来生成回答。", "context_used": []}
-            # 策略2：尝试让LLM无上下文回答（可能效果不佳）
-            # context_for_prompt = "没有可用的上下文信息。"
-            # 或者直接将 context_strings 作为空列表处理，由 prompt 模板决定如何展示
-            pass  # 继续往下走，让 prompt 模板处理空上下文
-        # 2. 构建 Prompt
-        # 你需要精心设计你的 Prompt 模板
-        context_block = (
-            "\n---\n".join(context_strings)
-            if context_strings
-            else "没有额外的上下文信息。"
-        )
-
-        # 3. 构建完整的 Prompt
-        prompt = f"""【指令】根据下面提供的上下文信息来回答用户提出的问题。
-        如果上下文中没有足够的信息来回答问题，请明确说明你无法从已知信息中找到答案，不要编造。
-        请使用中文回答。
-        【上下文】
-        {context_block}
-        【用户问题】
-        {query_text}
-        【回答】
-        """
-        logger.debug(f"构建的 Prompt (部分内容):\n{prompt[:500]}...")
-        # 4. 调用 LLM 生成文本 (这是一个同步阻塞操作)
+        context_strings = []  # 初始化为空列表，保证变量存在
+        answer_text = "抱歉，处理您的问题时发生了未知错误。"  # 设置默认错误答案
         try:
+            # 1. 从查询文本中获取上下文文本
+            context_strings: list[str] = await self.get_context_for_llm(query_text)
+            # 2. 【关键改动】如果找不到上下文，直接返回提示信息，不再调用 LLM
+            if not context_strings:
+                logger.warning("未获取到任何上下文文本，无法生成答案。")
+
+            # 2. 【关键改动】如果找不到上下文，直接返回提示信息，不再调用 LLM
+            if not context_strings:
+                logger.warning(f"未能为查询 '{query_text[:100]}...' 获取到上下文。")
+                answer_text = "抱歉，我们的知识库中没有找到与您问题直接相关的信息。"
+                # 直接构建并返回结果，确保数据结构完整
+                return {
+                    "query": query_text,
+                    "answer": answer_text,
+                    "retrieved_context_texts": [],  # 明确返回空列表
+                }
+            # 3. 构建 Prompt
+            # 你需要精心设计你的 Prompt 模板
+            context_block = (
+                "\n---\n".join(context_strings)
+                if context_strings
+                else "没有额外的上下文信息。"
+            )
+
+            prompt = f"""【指令】根据下面提供的上下文信息来回答用户提出的问题。
+            如果上下文中没有足够的信息来回答问题，请明确说明你无法从已知信息中找到答案，不要编造。
+            请使用中文回答。
+            【上下文】
+            {context_block}
+            【用户问题】
+            {query_text}
+            【回答】
+            """
+            logger.debug(f"构建的 Prompt (部分内容):\n{prompt[:500]}...")
+            # 4. 调用 LLM 生成文本 (这是一个同步阻塞操作)
             answer_text = await asyncio.to_thread(
                 generate_text_from_llm,  # 调用你 llm_service 中的函数
                 prompt=prompt,
@@ -271,34 +278,17 @@ class QueryService:
                 top_p=llm_top_p,
             )
             logger.info(f"LLM 成功为查询 '{query_text[:50]}...' 生成答案。")
-            # 为了透明度，可以考虑同时返回使用的上下文（Pydantic模型，而非纯文本）
-            # final_context_responses = await self.retrieve_relevant_chunks(query_text, settings.FINAL_CONTEXT_TOP_N)
 
-            return {
-                "query": query_text,
-                "answer": answer_text,
-                "retrieved_context_texts": context_strings,  # 返回实际用于生成答案的纯文本上下文
-                # "retrieved_context_full": [chunk.model_dump() for chunk in final_context_responses] # 可选：返回更详细的上下文信息
-            }
-        except RuntimeError as llm_error:  # 捕获 generate_text_from_llm 可能抛出的错误
-            logger.error(f"调用 LLM 生成答案时失败: {llm_error}", exc_info=True)
-            # 可以返回一个特定的错误响应
-            return {
-                "query": query_text,
-                "answer": f"抱歉，回答您的问题时发生内部错误: {llm_error}",
-                "retrieved_context_texts": context_strings,
-            }
         except Exception as e:
-            logger.error(f"生成答案过程中发生未知错误: {e}", exc_info=True)
-            return {
-                "query": query_text,
-                "answer": "抱歉，处理您的问题时发生未知错误。",
-                "retrieved_context_texts": context_strings,
-            }
-
-
-        
-        
-
-
-
+            logger.error(f"生成答案过程中发生错误: {e}", exc_info=True)
+            # 即使发生错误，也使用预设的错误信息
+            answer_text = "抱歉，回答您的问题时发生内部错误。请联系管理员。"
+            # 注意：在这种情况下，context_strings 可能已经有值，也可能是空列表
+            # 但我们依然会把它包含在返回中，以保持结构一致
+        # 5. 统一的返回出口
+        # 无论成功还是失败，都从这里返回一个结构完整的字典
+        return {
+            "query": query_text,
+            "answer": answer_text,
+            "retrieved_context_texts": context_strings,
+        }
