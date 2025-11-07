@@ -7,11 +7,14 @@
 @DOC: 
 """
 import asyncio
+from typing import Any
 
 from loguru import logger
-from MemeMind_LangChain.core.config import settings
+from MemeMind_LangChain.app.core.config import settings
 from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
 from MemeMind_LangChain.app.core.embedding import get_embeddings
+from MemeMind_LangChain.app.core.llm_service import generate_text_from_llm
+from MemeMind_LangChain.app.core.reranker import rerank_documents
 from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 
@@ -202,4 +205,97 @@ class QueryService:
 
         logger.info(f"已为 LLM 准备了 {len(context_texts)} 段上下文文本。")
         return context_texts
+
+    # --- 新增方法：用于生成最终答案 ---
+    async def generate_answer_from_query(
+            self,
+            query_text: str,
+            # 可以从 Pydantic 请求模型中获取这些参数，或者使用默认值
+            llm_max_tokens: int = 512,
+            llm_temperature: float = 0.7,
+            llm_top_p: float = 0.9,
+            llm_stop: list[str] | None = None,
+    ) -> dict[str, Any]:  # 返回包含答案和可能上下文的字典
+        """
+        从查询文本生成最终答案。
+        :param query_text: 用户输入的查询文本
+        :param llm_max_tokens: LLM 最大生成 token 数
+        :param llm_temperature: LLM 温度参数，控制生成的随机性
+        :param llm_top_p: LLM top_p 参数，用于 nucleus sampling
+        :param llm_stop: LLM 停止生成的字符串列表
+        :return: 包含答案和上下文的字典
+        """
+        logger.info(f"开始为查询生成答案: '{query_text[:100]}...'")
+        # 1. 从查询文本中获取上下文文本
+        context_strings: list[str] = await self.get_context_for_llm(query_text)
+
+        if not context_strings:
+            logger.warning("未获取到任何上下文文本，无法生成答案。")
+
+            # 策略1：直接返回无上下文提示
+            # return {"answer": "抱歉，未能找到与您问题相关的具体信息来生成回答。", "context_used": []}
+            # 策略2：尝试让LLM无上下文回答（可能效果不佳）
+            # context_for_prompt = "没有可用的上下文信息。"
+            # 或者直接将 context_strings 作为空列表处理，由 prompt 模板决定如何展示
+            pass  # 继续往下走，让 prompt 模板处理空上下文
+        # 2. 构建 Prompt
+        # 你需要精心设计你的 Prompt 模板
+        context_block = (
+            "\n---\n".join(context_strings)
+            if context_strings
+            else "没有额外的上下文信息。"
+        )
+
+        # 3. 构建完整的 Prompt
+        prompt = f"""【指令】根据下面提供的上下文信息来回答用户提出的问题。
+        如果上下文中没有足够的信息来回答问题，请明确说明你无法从已知信息中找到答案，不要编造。
+        请使用中文回答。
+        【上下文】
+        {context_block}
+        【用户问题】
+        {query_text}
+        【回答】
+        """
+        logger.debug(f"构建的 Prompt (部分内容):\n{prompt[:500]}...")
+        # 4. 调用 LLM 生成文本 (这是一个同步阻塞操作)
+        try:
+            answer_text = await asyncio.to_thread(
+                generate_text_from_llm,  # 调用你 llm_service 中的函数
+                prompt=prompt,
+                max_tokens=llm_max_tokens,
+                temperature=llm_temperature,
+                top_p=llm_top_p,
+                stop=llm_stop,
+            )
+            logger.info(f"LLM 成功为查询 '{query_text[:50]}...' 生成答案。")
+            # 为了透明度，可以考虑同时返回使用的上下文（Pydantic模型，而非纯文本）
+            # final_context_responses = await self.retrieve_relevant_chunks(query_text, settings.FINAL_CONTEXT_TOP_N)
+
+            return {
+                "query": query_text,
+                "answer": answer_text,
+                "retrieved_context_texts": context_strings,  # 返回实际用于生成答案的纯文本上下文
+                # "retrieved_context_full": [chunk.model_dump() for chunk in final_context_responses] # 可选：返回更详细的上下文信息
+            }
+        except RuntimeError as llm_error:  # 捕获 generate_text_from_llm 可能抛出的错误
+            logger.error(f"调用 LLM 生成答案时失败: {llm_error}", exc_info=True)
+            # 可以返回一个特定的错误响应
+            return {
+                "query": query_text,
+                "answer": f"抱歉，回答您的问题时发生内部错误: {llm_error}",
+                "retrieved_context_texts": context_strings,
+            }
+        except Exception as e:
+            logger.error(f"生成答案过程中发生未知错误: {e}", exc_info=True)
+            return {
+                "query": query_text,
+                "answer": "抱歉，处理您的问题时发生未知错误。",
+                "retrieved_context_texts": context_strings,
+            }
+
+
+        
+        
+
+
 
