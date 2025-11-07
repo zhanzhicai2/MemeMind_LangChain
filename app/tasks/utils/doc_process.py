@@ -22,26 +22,26 @@ from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 from MemeMind_LangChain.app.models.models import TextChunk
 from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
+from .doc_parser import parse_and_clean_document
 
-
-def parse_txt_bytes(file_bytes: bytes) -> str:
-    """
-    解析 TXT 文件字节流。
-    """
-    logger.info("文本格式为 TXT ，开始解析...")
-    try:
-        raw_text = file_bytes.decode(
-            "utf-8"
-        )  # 尝试 UTF-8，如果可能，考虑更灵活的编码检测
-        logger.info(f"TXT 解析完成，提取文本长度: {len(raw_text)}")
-        return raw_text
-    except UnicodeDecodeError as e:
-        logger.error(f"TXT 文件解码失败 (尝试UTF-8): {e}", exc_info=True)
-        # 可以尝试其他常见编码或直接报错
-        raise ValueError(f"无法解码 TXT 文件 (尝试UTF-8): {e}")
-    except Exception as e:
-        logger.error(f"解析 TXT 时发生错误: {e}", exc_info=True)
-        raise ValueError(f"无法解析 TXT 文件: {e}")
+# def parse_txt_bytes(file_bytes: bytes) -> str:
+#     """
+#     解析 TXT 文件字节流。
+#     """
+#     logger.info("文本格式为 TXT ，开始解析...")
+#     try:
+#         raw_text = file_bytes.decode(
+#             "utf-8"
+#         )  # 尝试 UTF-8，如果可能，考虑更灵活的编码检测
+#         logger.info(f"TXT 解析完成，提取文本长度: {len(raw_text)}")
+#         return raw_text
+#     except UnicodeDecodeError as e:
+#         logger.error(f"TXT 文件解码失败 (尝试UTF-8): {e}", exc_info=True)
+#         # 可以尝试其他常见编码或直接报错
+#         raise ValueError(f"无法解码 TXT 文件 (尝试UTF-8): {e}")
+#     except Exception as e:
+#         logger.error(f"解析 TXT 时发生错误: {e}", exc_info=True)
+#         raise ValueError(f"无法解析 TXT 文件: {e}")
 
 
 # --- 异步业务逻辑核心 ---
@@ -132,23 +132,17 @@ async def _execute_document_processing_async(
             # 第4步：根据文档类型解析文本内容
             # ==================================================================
             raw_text: str = ""
-            content_type = document_response.content_type.lower()  # 转小写以便匹配
-            original_filename = document_response.original_filename.lower()
+            content_type = document_response.content_type.lower()
 
             try:
-                if "text/plain" in content_type or original_filename.endswith(".txt"):
-                    raw_text = parse_txt_bytes(file_content_bytes)
-                # TODO: 添加更多文件类型的支持
-                else:
-                    unsupported_msg = f"不支持的文件类型: {document_response.content_type} (文件名: {document_response.original_filename})"
-                    logger.warning(f"{task_id_for_log} {unsupported_msg}")
-                    await source_doc_service.update_document_processing_info(
-                        document_id=document_response.id,
-                        current_user=None,
-                        status="error",
-                        error_message=unsupported_msg,
-                    )
-                    return {"status": "error", "message": unsupported_msg}  # 任务结束
+                logger.info("开始解析和清洗文档内容...")
+                # 将同步的、CPU密集型的解析和清洗任务放入后台线程执行
+                raw_text = await asyncio.to_thread(
+                    parse_and_clean_document,
+                    file_content_bytes,
+                    document_response.original_filename,
+                    document_response.content_type
+                )
 
                 if not raw_text.strip():  # 如果解析后文本为空
                     empty_content_msg = "解析后文本内容为空"
@@ -157,28 +151,24 @@ async def _execute_document_processing_async(
                     )
                     await source_doc_service.update_document_processing_info(
                         document_id=document_response.id,
-                        current_user=None,
                         status="error",
                         error_message=empty_content_msg,
                     )
                     return {"status": "error", "message": empty_content_msg}
 
-                logger.info(
-                    f"{task_id_for_log} (Async Logic) 文档 ID: {document_id} 内容解析完成，提取文本长度: {len(raw_text)}"
-                )
+                logger.info(f"文档内容解析和清洗成功，提取文本长度: {len(raw_text)}")
 
-            except ValueError as parse_error:  # 捕获由解析函数抛出的 ValueError
+            except Exception as parse_error:  # 捕获由解析函数抛出的 ValueError
                 logger.error(
                     f"{task_id_for_log} (Async Logic) 解析文档 {document_response.original_filename} 失败: {parse_error}",
                     exc_info=True,
                 )
                 await source_doc_service.update_document_processing_info(
                     document_id=document_response.id,
-                    current_user=None,
                     status="error",
                     error_message=f"文档解析失败: {str(parse_error)[:255]}",
                 )
-                raise parse_error  # 重新抛出，让 Celery 标记任务失败或重试
+                raise parse_error  # 重新抛出，标记任务失败
 
             # ==================================================================
             # 第5步：将文本内容分割成小块 (Chunks)
