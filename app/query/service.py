@@ -12,9 +12,9 @@ from typing import Any
 from loguru import logger
 from MemeMind_LangChain.app.core.config import settings
 from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
-from MemeMind_LangChain.app.core.embedding import get_embeddings
+from MemeMind_LangChain.app.core.embedding_qwen import get_embeddings
 from MemeMind_LangChain.app.core.llm_service import generate_text_from_llm
-from MemeMind_LangChain.app.core.reranker import rerank_documents
+from MemeMind_LangChain.app.core.reranker_qwen import rerank_documents
 from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 
@@ -42,7 +42,8 @@ class QueryService:
             embeddings_list = await asyncio.to_thread(
                 get_embeddings,  # 同步函数
                 [query_text],  # 作为单元素列表传入
-                instruction=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL  # 从配置中获取指令
+                task_description=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL,
+                is_query=True,
             )
             if not embeddings_list:
                 logger.error(f"查询文本 '{query_text}' 的向量化结果为空。")
@@ -160,7 +161,12 @@ class QueryService:
             # rerank_documents 是同步的，CPU/GPU密集型，也需要放入线程
             reranked_results: list[
                 tuple[TextChunkResponse, float]
-            ] = await asyncio.to_thread(rerank_documents, query_text, candidate_chunks)
+            ] = await asyncio.to_thread(
+                rerank_documents,
+                query_text,
+                candidate_chunks,
+                settings.RERANKER_INSTRUCTION,
+            )
 
             # 提取最终的 top_n 个文档块
             final_top_n_chunks: list[TextChunkResponse] = [
@@ -214,7 +220,6 @@ class QueryService:
             llm_max_tokens: int = 512,
             llm_temperature: float = 0.7,
             llm_top_p: float = 0.9,
-            llm_stop: list[str] | None = None,
     ) -> dict[str, Any]:  # 返回包含答案和可能上下文的字典
         """
         从查询文本生成最终答案。
@@ -222,7 +227,6 @@ class QueryService:
         :param llm_max_tokens: LLM 最大生成 token 数
         :param llm_temperature: LLM 温度参数，控制生成的随机性
         :param llm_top_p: LLM top_p 参数，用于 nucleus sampling
-        :param llm_stop: LLM 停止生成的字符串列表
         :return: 包含答案和上下文的字典
         """
         logger.info(f"开始为查询生成答案: '{query_text[:100]}...'")
@@ -262,10 +266,9 @@ class QueryService:
             answer_text = await asyncio.to_thread(
                 generate_text_from_llm,  # 调用你 llm_service 中的函数
                 prompt=prompt,
-                max_tokens=llm_max_tokens,
+                max_new_tokens=llm_max_tokens,
                 temperature=llm_temperature,
                 top_p=llm_top_p,
-                stop=llm_stop,
             )
             logger.info(f"LLM 成功为查询 '{query_text[:50]}...' 生成答案。")
             # 为了透明度，可以考虑同时返回使用的上下文（Pydantic模型，而非纯文本）
