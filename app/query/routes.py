@@ -43,7 +43,7 @@ async def retrieve_chunks_for_query(
     try:
         relevant_chunks = await query_service.retrieve_relevant_chunks(
             query_text=request_data.query, # 用户查询文本
-            top_k=request_data.top_k) # 检索 top_k 个相关文本块
+            top_k_final_reranked=request_data.top_k) # 检索 top_k 个相关文本块
         if not relevant_chunks:
             # 可以返回空列表，或者根据业务需求抛出 404
             # raise HTTPException(status_code=404, detail="No relevant chunks found.")
