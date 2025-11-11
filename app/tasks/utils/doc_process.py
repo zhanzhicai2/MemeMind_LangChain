@@ -24,6 +24,7 @@ from MemeMind_LangChain.app.models.models import TextChunk
 from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
 from .doc_parser import parse_and_clean_document
 
+
 # def parse_txt_bytes(file_bytes: bytes) -> str:
 #     """
 #     解析 TXT 文件字节流。
@@ -46,7 +47,7 @@ from .doc_parser import parse_and_clean_document
 
 # --- 异步业务逻辑核心 ---
 async def _execute_document_processing_async(
-    document_id: int, task_id_for_log: str
+        document_id: int, task_id_for_log: str
 ):
     # 1. 延迟初始化：在函数开始时，为本次任务创建专属的数据库引擎和会话工厂
     #    它们会自动绑定到由 Celery 任务创建的那个全新的事件循环上。
@@ -78,7 +79,7 @@ async def _execute_document_processing_async(
             # 第1步：获取文档元数据
             # ==================================================================
             document_response = await source_doc_service.get_document(
-                document_id=document_id, current_user=None
+                document_id=document_id
             )
             if not document_response:
                 logger.error(
@@ -95,7 +96,7 @@ async def _execute_document_processing_async(
             # 第2步：更新文档状态为 "processing"
             # ==================================================================
             await source_doc_service.update_document_processing_info(
-                document_id=document_response.id, current_user=None, status="processing"
+                document_id=document_response.id, status="processing"
             )
             logger.info(
                 f"{task_id_for_log} (Async Logic) 文档 {document_response.id} 状态更新为 'processing'"
@@ -122,7 +123,6 @@ async def _execute_document_processing_async(
                 )
                 await source_doc_service.update_document_processing_info(
                     document_id=document_response.id,
-                    current_user=None,
                     status="error",
                     error_message=f"S3下载失败: {str(s3_error)[:255]}",
                 )
@@ -141,7 +141,7 @@ async def _execute_document_processing_async(
                     parse_and_clean_document,
                     file_content_bytes,
                     document_response.original_filename,
-                    document_response.content_type
+                    document_response.content_type,
                 )
 
                 if not raw_text.strip():  # 如果解析后文本为空
@@ -189,13 +189,13 @@ async def _execute_document_processing_async(
             chunks_texts_list: list[str] = []
             if len(raw_text) > chunk_size:
                 for i in range(0, len(raw_text), chunk_size - chunk_overlap):
-                    chunk = raw_text[i : i + chunk_size]
+                    chunk = raw_text[i: i + chunk_size]
                     chunks_texts_list.append(chunk)
             elif raw_text:  # 如果文本不为空但小于块大小，则本身作为一个块
                 chunks_texts_list.append(raw_text)
 
             if (
-                not chunks_texts_list and raw_text
+                    not chunks_texts_list and raw_text
             ):  # 如果有原始文本但未能分块（逻辑问题）
                 logger.warning(
                     f"{task_id_for_log} (Async Logic) 文本分块结果为空，但原始文本不为空。文档ID: {document_id}"
@@ -217,7 +217,7 @@ async def _execute_document_processing_async(
                     # 你可以在这里为 metadata_json 添加更多信息，例如如果解析时得到了页码
                     chunk_meta = {"parsed_by": "default_parser_v1"}
                     if (
-                        "pdf" in content_type
+                            "pdf" in content_type
                     ):  # 示例：如果是pdf，可以尝试从解析器获取页码信息
                         # chunk_meta["page_number"] = extracted_page_number_for_this_chunk
                         pass
@@ -248,7 +248,7 @@ async def _execute_document_processing_async(
                     )
                     await source_doc_service.update_document_processing_info(
                         document_id=document_response.id,
-                        current_user=None,
+
                         status="error",
                         error_message=f"存储文本块失败: {str(db_chunk_error)[:255]}",
                     )
@@ -287,7 +287,7 @@ async def _execute_document_processing_async(
                     )
                     await source_doc_service.update_document_processing_info(
                         document_id=document_response.id,
-                        current_user=None,
+
                         status="error",
                         error_message=f"向量化失败: {str(embed_error)[:255]}",
                         number_of_chunks=number_of_chunks_created,  # 已创建的块数量还是记录一下
@@ -339,7 +339,7 @@ async def _execute_document_processing_async(
                         )
                         await source_doc_service.update_document_processing_info(
                             document_id=document_response.id,
-                            current_user=None,
+
                             status="error",
                             error_message=f"向量存储失败: {str(chroma_error)[:255]}",
                             number_of_chunks=number_of_chunks_created,
@@ -355,7 +355,7 @@ async def _execute_document_processing_async(
             # ==================================================================
             await source_doc_service.update_document_processing_info(
                 document_id=document_response.id,
-                current_user=None,
+
                 status="ready",
                 set_processed_now=True,
                 number_of_chunks=number_of_chunks_created,
@@ -384,7 +384,7 @@ async def _execute_document_processing_async(
                     )  # 重新实例化 service
                     await error_service.update_document_processing_info(
                         document_id=document_id,
-                        current_user=None,
+
                         status="error",
                         error_message=f"Celery任务异步逻辑最终错误: {str(e)[:250]}",  # 确保不超过数据库字段长度
                     )

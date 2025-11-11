@@ -25,7 +25,7 @@ from MemeMind_LangChain.app.core.exceptions import AlreadyExistsException, NotFo
 from MemeMind_LangChain.app.models.models import SourceDocument  # 源文档数据模型
 
 # 导入数据模式
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate,UserResponse  # 文档数据模式
+from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate  # 文档数据模式
 
 
 # 源文档数据仓库类：提供数据库操作接口
@@ -35,7 +35,7 @@ class SourceDocumentRepository:
         self.session = session  # 存储数据库会话实例，用于执行数据库操作
 
     # 异步方法：创建新的文档记录
-    async def create(self, data: SourceDocumentCreate, current_user: UserResponse | None) -> SourceDocument:  # 参数：创建数据，当前用户，返回值：文档对象
+    async def create(self, data: SourceDocumentCreate) -> SourceDocument:  # 参数：创建数据，返回值：文档对象
         """
         创建一个新的文档记录
         :param data: 文档创建数据
@@ -49,7 +49,6 @@ class SourceDocumentRepository:
             original_filename=data.original_filename,  # 原始文件名
             content_type=data.content_type,  # MIME类型
             size=data.size,  # 文件大小
-            owner_id=current_user.id if current_user else None,  # 所有者ID
         )
         # 添加到会话中
         self.session.add(new_document)  # 添加到数据库会话
@@ -65,16 +64,13 @@ class SourceDocumentRepository:
             # 抛出已存在异常
             raise AlreadyExistsException(f"源文档{data.object_name} 已存在")  # 抛出自定义异常
 
-    async def get_by_id(self, document_id: int, current_user: UserResponse | None) -> SourceDocument:
+    async def get_by_id(self, document_id: int) -> SourceDocument:
         """
         更新文档记录
         :param document_id:
-        :param current_user: 当前用户
         :return: 更新后的文档记录
         """
         query = select(SourceDocument).where(SourceDocument.id == document_id)
-        if current_user:  # 仅当 current_user 存在时添加 owner_id 过滤
-            query = query.where(SourceDocument.owner_id == current_user.id)  # 仅查询当前用户的文档
         result = await self.session.execute(query)
         document = result.one_or_none()
         if not document:
@@ -99,13 +95,9 @@ class SourceDocumentRepository:
             limit: int,  # 参数：限制数量
             offset: int,  # 参数：偏移量
             order_by: str | None,  # 参数：排序字段
-            current_user: UserResponse | None,  # 参数：当前用户
     ) -> list[SourceDocument]:  # 返回值：文档对象列表
         # 构建基础查询
         query = select(SourceDocument)
-        if current_user:  # 仅当 current_user 存在时添加 owner_id 过滤
-            query = query.where(SourceDocument.owner_id == current_user.id)  # 只查询当前用户的文档
-
         # 添加排序条件
         if order_by:  # 如果指定了排序字段
             if order_by == "created_at desc":  # 按创建时间降序
@@ -122,12 +114,10 @@ class SourceDocumentRepository:
 
     # 异步方法：更新文档记录
     async def update(
-            self, data: SourceDocumentUpdate, document_id: int,current_user: UserResponse | None) -> SourceDocument:  # 参数：更新数据，文档ID，返回值：更新后的文档对象
+            self, data: SourceDocumentUpdate, document_id: int) -> SourceDocument:  # 参数：更新数据，文档ID，返回值：更新后的文档对象
 
         # 构建查询条件
         query = select(SourceDocument).where(SourceDocument.id == document_id)  # 查询指定ID的文档
-        if current_user:  # 仅当 current_user 存在时添加 owner_id 过滤
-            query = query.where(SourceDocument.owner_id == current_user.id)  # 仅查询当前用户的文档
         # 执行查询
         result = await self.session.scalars(query)  # 执行标量查询
         # 获取文档对象
@@ -139,9 +129,8 @@ class SourceDocumentRepository:
             )
         # 转换更新数据为字典，排除未设置的字段
         update_data = data.model_dump(exclude_unset=True)  # 只包含有值的字段
-        # 确保不修改 id 和 owner_id
+        # 确保不修改 id
         update_data.pop("id", None)  # 移除ID字段
-        update_data.pop("owner_id", None)  # 移除所有者ID字段
         # 检查是否有可更新的字段
         if not update_data:  # 如果没有可更新的字段
             raise ValueError("No fields to update")  # 抛出值错误异常
@@ -155,10 +144,10 @@ class SourceDocumentRepository:
         return document  # 返回更新后的文档对象
 
     # 异步方法：删除文档记录
-    async def delete(self, document_id: int, current_user: UserResponse | None) -> None:  # 参数：文档ID，当前用户，无返回值
+    async def delete(self, document_id: int) -> None:  # 参数：文档ID，无返回值
         try:
             # 通过ID获取文档
-            document = await self.session.get(SourceDocument, document_id)  # 从数据库获取文档对象
+            document = await self.get_by_id(document_id)  # 从数据库获取文档对象
         except NotFoundException:
             raise  NotFoundException  # 直接抛出
 

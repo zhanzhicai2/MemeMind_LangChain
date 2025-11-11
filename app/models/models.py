@@ -20,7 +20,7 @@
 # 导入日期时间相关模块：datetime用于时间戳，timezone用于时区处理
 from datetime import datetime, timezone
 # 导入Optional类型注解，用于可空字段
-from typing import Optional
+from typing import Optional, List
 # 导入enum模块，用于创建枚举类
 import enum
 
@@ -54,94 +54,12 @@ class DateTimeMixin:
         onupdate=lambda: datetime.now(timezone.utc), # 更新记录时自动设置为当前UTC时间
     )
 
-
-# 用户模型 (不依赖 fastapi-users，但为未来集成做准备)
-class User(Base, DateTimeMixin):
-    __tablename__ = "users_account"  # 指定数据库表名
-
-    # 用户ID：主键，自增整数
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    # 用户名：唯一字段，用于登录和显示
-    username: Mapped[str] = mapped_column(
-        String(100),        # 字符串类型，最大长度100
-        unique=True,        # 唯一约束，确保用户名不重复
-        index=True,         # 创建索引以提高查询性能
-        nullable=False      # 不允许为空
-    )
-
-    # 用户全名：可选字段，用于显示用户真实姓名
-    full_name: Mapped[Optional[str]] = mapped_column(
-        String(100),        # 字符串类型，最大长度100
-        nullable=True       # 允许为空
-    )
-
-    # 邮箱地址：为 fastapi-users 预留的字段，用于用户认证
-    email: Mapped[Optional[str]] = mapped_column(
-        String(320),        # 字符串类型，最大长度320（符合RFC标准）
-        unique=True,        # 唯一约束，确保邮箱不重复
-        index=True,         # 创建索引以提高查询性能
-        nullable=True       # 允许为空（暂时可选）
-    )
-
-    # 加密密码：为 fastapi-users 预留的字段，存储加密后的密码
-    hashed_password: Mapped[Optional[str]] = mapped_column(
-        String(1024),       # 字符串类型，最大长度1024（足够存储加密密码）
-        nullable=True       # 允许为空（暂时可选）
-    )
-
-    # 账户状态：标识用户账户是否激活
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,            # 布尔类型
-        default=True,       # 默认值为True（新用户默认激活）
-        nullable=False      # 不允许为空
-    )
-
-    # 超级用户标识：标识用户是否为系统管理员
-    is_superuser: Mapped[bool] = mapped_column(
-        Boolean,            # 布尔类型
-        default=False,      # 默认值为False（普通用户）
-        nullable=False      # 不允许为空
-    )
-
-    # 邮箱验证状态：标识用户邮箱是否已验证
-    is_verified: Mapped[bool] = mapped_column(
-        Boolean,            # 布尔类型
-        default=False,      # 默认值为False（新用户未验证）
-        nullable=False      # 不允许为空
-    )
-
-    # 关系映射：用户与源文档的一对多关系
-    source_documents: Mapped[list["SourceDocument"]] = relationship(
-        "SourceDocument",   # 关联的模型类名
-        back_populates="owner"  # 反向关系属性名
-    )
-
-    # 关系映射：用户与对话的一对多关系，级联删除
-    conversations: Mapped[list["Conversation"]] = relationship(
-        "Conversation",     # 关联的模型类名
-        back_populates="user",  # 反向关系属性名
-        cascade="all, delete-orphan"  # 级联操作：用户删除时同时删除其所有对话
-    )
-
-    # 字符串表示方法：用于调试和日志输出
-    def __repr__(self):
-        return f"<User(id={self.id}, username={self.username})>"  # 显示用户ID和用户名
-
-
 # 源文档模型：存储上传到MinIO的文档信息
 class SourceDocument(Base, DateTimeMixin):
     __tablename__ = "source_documents"  # 指定数据库表名
 
     # 文档ID：主键，自增整数
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    # 文档所有者ID：外键关联用户表，可选字段（支持匿名文档）
-    owner_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("user_account.id", ondelete="SET NULL"),  # 外键约束，用户删除时设置为NULL
-        nullable=True,      # 允许为空（支持匿名上传）
-        index=True,         # 创建索引以提高按用户查询文档的性能
-    )
 
     # MinIO对象名称：在存储桶中的唯一标识符
     object_name: Mapped[str] = mapped_column(
@@ -201,24 +119,12 @@ class SourceDocument(Base, DateTimeMixin):
         Integer,            # 整数类型
         nullable=True       # 允许为空（未处理时为空）
     )
-
-    # 关系映射：文档与用户的多对一关系
-    owner: Mapped[Optional["User"]] = relationship(
-        "User",             # 关联的模型类名
-        back_populates="source_documents"  # 反向关系属性名
-    )
-
     # 关系映射：文档与文本块的一对多关系，级联删除
     text_chunks: Mapped[list["TextChunk"]] = relationship(
         "TextChunk",        # 关联的模型类名
         back_populates="source_document",  # 反向关系属性名
         cascade="all, delete-orphan"  # 级联操作：文档删除时同时删除其所有文本块
     )
-
-    # 字符串表示方法：用于调试和日志输出
-    def __repr__(self):
-        return f"<SourceDocument(id={self.id}, filename='{self.original_filename}', status='{self.status}')>"
-
 # 文本块模型：存储文档分块后的文本内容，用于向量化存储和检索
 class TextChunk(Base, DateTimeMixin):
     __tablename__ = "text_chunks"  # 指定数据库表名
@@ -262,48 +168,9 @@ class TextChunk(Base, DateTimeMixin):
         nullable=True       # 允许为空（可选字段）
     )  # 例如：{'page': 5, 'section': 'Introduction', 'paragraph': 2}
 
-    # 字符串表示方法：用于调试和日志输出
-    def __repr__(self):
-        return f"<TextChunk(id={self.id}, source_document_id={self.source_document_id}, len_text={len(self.chunk_text)})>"
-
-# 对话模型：管理用户与AI的对话会话
-class Conversation(Base, DateTimeMixin):
-    __tablename__ = "conversations"  # 指定数据库表名
-
-    # 对话ID：主键，自增整数
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    # 用户ID：外键关联用户表，可选字段（支持匿名对话）
-    user_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"),  # 外键约束，用户删除时级联删除对话
-        index=True,         # 创建索引以提高按用户查询对话的性能
-        nullable=True,      # 允许为空（支持匿名对话）
-    )
-
-    # 关系映射：对话与用户的多对一关系
-    user: Mapped[Optional["User"]] = relationship(
-        "User",             # 关联的模型类名
-        back_populates="conversations"  # 反向关系属性名
-    )
-
-    # 对话标题：可选字段，用于显示对话主题
-    title: Mapped[Optional[str]] = mapped_column(
-        String(255),        # 字符串类型，最大长度255
-        nullable=True       # 允许为空（可以自动生成或留空）
-    )
-
-    # 反向关系：对话与消息的一对多关系，级联删除
-    messages: Mapped[list["Message"]] = relationship(
-        "Message",          # 关联的模型类名
-        back_populates="conversation",  # 反向关系属性名
-        cascade="all, delete-orphan"    # 级联操作：对话删除时同时删除其所有消息
-    )
-
-    # 字符串表示方法：用于调试和日志输出
-    def __repr__(self):
-        return f"<Conversation(id={self.id}, user_id={self.user_id}, title='{self.title}')>"
-
-
+# ==========================================
+# --- 全新设计的 Message 模型 ---
+# ==========================================
 # 消息作者枚举：标识消息的发送者类型
 class MessageAuthor(str, enum.Enum):
     USER = "user"  # 用户消息
@@ -316,17 +183,19 @@ class Message(Base, DateTimeMixin):
     # 消息ID：主键，自增整数
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    # 对话ID：外键关联对话表，标识消息所属的对话
-    conversation_id: Mapped[int] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"),  # 外键约束，对话删除时级联删除消息
-        nullable=False,     # 不允许为空（每条消息必须属于一个对话）
-        index=True          # 创建索引以提高按对话查询消息的性能
+    # 自引用的外键，用于连接回答和问题
+    response_to_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("messages.id"),
+        nullable=True,      # 允许为空（根消息没有父消息）
+        index=True          # 创建索引以提高按父消息查询子消息的性能
     )
-
-    # 关系映射：消息与对话的多对一关系
-    conversation: Mapped["Conversation"] = relationship(
-        "Conversation",     # 关联的模型类名
-        back_populates="messages"  # 反向关系属性名
+    # 建立关系，一个'user'消息可以有多个'bot'回答（尽管通常只有一个）
+    # 一个'bot'消息只对应一个'user'提问
+    user_query: Mapped[Optional["Message"]] = relationship(
+        "Message", remote_side=[id], back_populates="bot_responses"
+    )
+    bot_responses: Mapped[List["Message"]] = relationship(
+        "Message", back_populates="user_query"
     )
 
     # 消息作者：标识消息是用户发送的还是AI生成的
@@ -334,31 +203,7 @@ class Message(Base, DateTimeMixin):
         SQLAlchemyEnum(MessageAuthor),  # SQL枚举类型，限制只能是USER或BOT
         nullable=False      # 不允许为空（每条消息必须有作者）
     )  # 用于区分是用户输入还是AI回答
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 存储用于生成答案的上下文信息 (仅对 bot 消息有意义)
+    retrieved_chunk_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
 
-    # 用户查询文本：用户提出的问题或输入内容
-    query_text: Mapped[Optional[str]] = mapped_column(
-        Text,               # 长文本类型，无长度限制
-        nullable=True       # 允许为空（AI消息可能没有query_text）
-    )  # 用户的消息内容
-
-    # AI回答文本：AI生成的回答内容
-    answer_text: Mapped[Optional[str]] = mapped_column(
-        Text,               # 长文本类型，无长度限制
-        nullable=True       # 允许为空（用户消息可能没有answer_text）
-    )  # AI的回答内容
-
-    # 检索到的文本块ID列表：存储用于生成AI回答的上下文信息（非常有用）
-    # 这是RAG系统的核心字段，记录了哪些文本块被用于生成当前回答
-    retrieved_chunk_ids: Mapped[Optional[list[int]]] = mapped_column(
-        JSON,               # JSON类型，存储整数列表
-        nullable=True       # 允许为空（非RAG回答或系统消息可能为空）
-    )  # 存储用于生成回答的TextChunk.id列表，用于追溯回答来源
-
-    # 字符串表示方法：用于调试和日志输出，根据作者类型显示不同信息
-    def __repr__(self):
-        if self.author == MessageAuthor.USER:
-            # 用户消息显示查询文本长度
-            return f"<Message(id={self.id}, conversation_id={self.conversation_id}, author='user', query_len={len(self.query_text or '')})>"
-        else:
-            # AI消息显示回答文本长度
-            return f"<Message(id={self.id}, conversation_id={self.conversation_id}, author='bot', answer_len={len(self.answer_text or '')})>"

@@ -16,21 +16,16 @@
 # 导入类型注解相关模块
 from typing import Annotated, Union  # 类型注解和联合类型
 
-# 导入docutils相关模块（似乎未使用，可考虑移除）
-from docutils.nodes import status  # 文档处理节点状态（实际未使用）
 
 # 导入FastAPI相关组件
 from fastapi import APIRouter, Query  # API路由器和查询参数
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession  # 异步数据库会话
 from fastapi import Depends, status  # 依赖注入和HTTP状态码
-from fastapi.responses import FileResponse  # 文件响应（未使用，可考虑移除）
-from fastapi.security import HTTPBearer  # HTTP承载认证（未使用，可考虑移除）
 from fastapi import UploadFile, File  # 文件上传和文件对象
 from starlette.responses import StreamingResponse  # 流式响应
 
 # 导入应用核心模块
-from MemeMind_LangChain.app.core import get_logger  # 日志记录器
 from MemeMind_LangChain.app.core.database import get_db  # 数据库依赖获取函数
 
 # 导入数据模式和响应模型
@@ -70,10 +65,9 @@ async def upload_document_route(  # 异步函数：上传文档
             UploadFile, File(..., title="Source Document", description="Upload a file")  # 文件上传对象，必填，设置标题和描述
         ],
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
-        # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉，后续实现用户认证）
 ):  # 无返回类型注解，因为返回SourceDocumentResponse
     try:  # 尝试执行文档上传操作
-        created_document = await service.add_document(file=file, current_user=None)  # 调用服务层添加文档，当前用户为None
+        created_document = await service.add_document(file=file)  # 调用服务层添加文档，当前用户为None
         logger.info(f"Uploaded document {created_document.id}")  # 记录上传成功的日志信息
         return created_document  # 返回创建的文档信息给客户端
     except Exception as e:  # 捕获所有异常
@@ -90,11 +84,10 @@ async def upload_document_route(  # 异步函数：上传文档
 async def download_attachment_route(  # 异步函数：下载文档（函数名与路由不匹配，建议统一命名）
         document_id: int,  # 参数：文档ID，从URL路径获取
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
-        # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
 ):  # 无返回类型注解，因为返回StreamingResponse
     try:  # 尝试执行文档下载操作
         response = await service.download_document(  # 调用服务层下载文档
-            document_id=document_id, current_user=None  # 传入文档ID，当前用户为None
+            document_id=document_id # 传入文档ID，当前用户为None
         )
         return response  # 返回文件流响应给客户端
     except Exception as e:  # 捕获所有异常
@@ -111,10 +104,9 @@ async def download_attachment_route(  # 异步函数：下载文档（函数名�
 async def delete_attachment_route(  # 异步函数：删除文档（函数名建议统一为delete_document）
         document_id: int,  # 参数：文档ID，但路由使用attachment_id（命名不一致问题）
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
-        # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
 ):  # 无返回值
     try:  # 尝试执行文档删除操作
-        await service.delete_document(document_id=document_id, current_user=None)  # 调用服务层删除文档
+        await service.delete_document(document_id=document_id)  # 调用服务层删除文档
         logger.info(f"Deleted document {document_id}")  # 记录删除成功的日志信息
     except Exception as e:  # 捕获所有异常
         logger.error(f"Failed to delete document {document_id}: {str(e)}")  # 记录删除失败的错误日志
@@ -130,14 +122,12 @@ async def delete_attachment_route(  # 异步函数：删除文档（函数名建
 async def get_all_documents(  # 异步函数：获取所有文档
         params: DocumentQueryParams = Depends(),  # 查询参数，包含分页、排序等
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
-        # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
 ) -> list[SourceDocumentResponse]:  # 返回值：文档响应对象列表
     try:  # 尝试执行文档列表查询操作
         all_documents = await service.get_documents(  # 调用服务层获取文档列表
             order_by=params.order_by,  # 排序字段（如创建时间升序或降序）
             limit=params.limit,  # 限制返回的文档数量（分页大小）
             offset=params.offset,  # 分页偏移量（跳过的文档数量）
-            current_user=None,  # 当前用户为None
         )
         logger.info(f"Retrieved {len(all_documents)} documents")  # 记录查询成功的日志，注意使用了attachments命名
         return all_documents  # 返回文档列表给客户端
@@ -158,11 +148,10 @@ async def get_document(  # 异步函数：获取文档详情或预签名URL
             bool, Query(description="If true, return pre-signed URL")  # 布尔类型，查询参数，添加描述信息
         ] = False,  # 默认值为False，即返回文档信息而不是预签名URL
         service: SourceDocumentService = Depends(get_document_service),  # 通过依赖注入获取文档服务实例
-        # current_user: UserResponse = Depends(get_current_user),  # 当前用户（暂时注释掉）
 ) -> Union[SourceDocumentResponse, PresignedUrlResponse]:  # 返回值：文档响应对象或预签名URL响应对象
     if presigned:  # 如果请求预签名URL
         try:  # 尝试生成预签名URL
-            response = await service.get_presigned_url(document_id, current_user=None)  # 调用服务层生成预签名URL
+            response = await service.get_presigned_url(document_id)  # 调用服务层生成预签名URL
             logger.info(f"Generated pre-signed URL for document {document_id}")  # 记录生成成功的日志
             return response  # 返回预签名URL响应对象
         except Exception as e:  # 捕获所有异常
@@ -174,7 +163,6 @@ async def get_document(  # 异步函数：获取文档详情或预签名URL
         try:  # 尝试获取文档详情
             document = await service.get_document(  # 调用服务层获取文档
                 document_id=document_id,  # 文档ID
-                current_user=None,  # 当前用户为None
             )
             logger.info(f"Retrieved document {document_id}")  # 记录获取成功的日志
             return document  # 返回文档响应对象

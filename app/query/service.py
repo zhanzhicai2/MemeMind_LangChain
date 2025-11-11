@@ -213,14 +213,14 @@ class QueryService:
         logger.info(f"已为 LLM 准备了 {len(context_texts)} 段上下文文本。")
         return context_texts
 
-    # --- 新增方法：用于生成最终答案 ---
+    # --- 用于生成最终答案 ---
     async def generate_answer_from_query(
             self,
             query_text: str,
             # 可以从 Pydantic 请求模型中获取这些参数，或者使用默认值
-            llm_max_tokens: int = 512,
-            llm_temperature: float = 0.7,
-            llm_top_p: float = 0.9,
+            llm_max_tokens: int = 512,  # LLM 最大生成 token 数
+            llm_temperature: float = 0.7,  # LLM 温度参数，控制生成的随机性
+            llm_top_p: float = 0.9,  # LLM top_p 参数，用于 nucleus sampling
     ) -> dict[str, Any]:  # 返回包含答案和可能上下文的字典
         """
         处理用户查询，检索上下文，并调用LLM生成答案。
@@ -237,11 +237,11 @@ class QueryService:
         try:
             # 1. 从查询文本中获取上下文文本
             context_strings: list[str] = await self.get_context_for_llm(query_text)
-            # 2. 【关键改动】如果找不到上下文，直接返回提示信息，不再调用 LLM
+            # 2. 如果找不到上下文，直接返回提示信息，不再调用 LLM
             if not context_strings:
                 logger.warning("未获取到任何上下文文本，无法生成答案。")
 
-            # 2. 【关键改动】如果找不到上下文，直接返回提示信息，不再调用 LLM
+            # 2. 如果找不到上下文，直接返回提示信息，不再调用 LLM
             if not context_strings:
                 logger.warning(f"未能为查询 '{query_text[:100]}...' 获取到上下文。")
                 answer_text = "抱歉，我们的知识库中没有找到与您问题直接相关的信息。"

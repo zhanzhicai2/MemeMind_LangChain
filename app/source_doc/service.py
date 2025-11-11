@@ -13,7 +13,7 @@
 - 预签名URL生成
 - 异步文档处理任务管理
 """
-
+import mimetypes
 # 导入URL编码模块，用于处理文件名中的特殊字符
 from urllib.parse import quote
 
@@ -25,7 +25,6 @@ from fastapi.responses import StreamingResponse  # 流式响应，用于文件�
 from botocore.exceptions import ClientError  # AWS客户端异常处理
 
 # 导入标准库组件
-from typing import Optional  # 可选类型注解
 import uuid  # UUID生成器，用于生成唯一标识符
 from datetime import datetime, timedelta, timezone  # 日期时间处理
 
@@ -45,11 +44,7 @@ from MemeMind_LangChain.app.schemas.schemas import (  # Pydantic数据模式
     SourceDocumentUpdate,  # 文档更新模式
     SourceDocumentResponse,  # 文档响应模式
     PresignedUrlResponse,  # 预签名URL响应模式
-    UserResponse,  # 用户响应模式
 )
-
-
-
 
 
 # 源文档服务类：提供文档管理的业务逻辑
@@ -62,13 +57,26 @@ class SourceDocumentService:
 
     # 异步方法：添加文档到系统
     async def add_document(
-            self, file: UploadFile, current_user: UserResponse | None  # 参数：上传的文件对象，当前用户信息
+            self, file: UploadFile  # 参数：上传的文件对象，当前用户信息
     ) -> SourceDocumentResponse:  # 返回值：创建的文档响应对象
         # ===== 1. 文件元数据处理,从 UploadFile 获取文件元数据 =====
         # 获取原始文件名，如果没有文件名则生成一个UUID名称
         original_filename = file.filename or f"unnamed_{uuid.uuid4()}"  # 确保文件名不为空
-        # 获取文件MIME类型，如果没有则使用默认二进制类型
-        content_type = file.content_type or "application/octet-stream"  # 默认二进制流类型
+        #    --- 校准 content_type ---
+        client_provided_content_type = file.content_type  # 默认二进制流类型
+        #    根据文件名后缀猜测正确的MIME类型
+        guessed_type, _ = mimetypes.guess_type(original_filename)
+        #    决定最终使用的 content_type，建立信任链：
+        #    我们自己的猜测 > 客户端的提供 > 通用默认值
+        final_content_type = (
+                guessed_type or client_provided_content_type or "application/octet-stream"
+        )
+        logger.info(
+            f"文件上传: {original_filename}, "
+            f"客户端提供类型: {client_provided_content_type}, "
+            f"修正后类型: {final_content_type}"
+        )
+
 
         try:
             # 移动文件指针到末尾以获取文件大小
@@ -98,7 +106,7 @@ class SourceDocumentService:
                 Fileobj=file.file,  # 文件对象
                 Bucket=settings.MINIO_BUCKET,  # 存储桶名称
                 Key=object_name,  # 对象键（路径）
-                ExtraArgs={"ContentType": content_type},  # 额外参数：设置MIME类型
+                ExtraArgs={"ContentType": final_content_type},  # 额外参数：设置MIME类型
             )
         except ClientError as e:  # 捕获AWS客户端错误
             # 从错误响应中提取错误代码
@@ -132,12 +140,12 @@ class SourceDocumentService:
             object_name=object_name,  # 对象名称
             bucket_name=settings.MINIO_BUCKET,  # 存储桶名称
             original_filename=original_filename,  # 原始文件名
-            content_type=content_type,  # MIME类型
+            content_type=final_content_type,  # MIME类型
             size=size,  # 文件大小
         )
         try:
             # 在数据库中创建文档记录
-            new_document = await self.repository.create(document_data, current_user)  # 调用仓库创建方法
+            new_document = await self.repository.create(document_data)  # 调用仓库创建方法
             # 验证并转换为响应对象
             result = SourceDocumentResponse.model_validate(new_document)  # 模型验证转换
             # 发送异步文档处理任务
@@ -167,10 +175,10 @@ class SourceDocumentService:
 
     # 异步方法：获取单个文档
     async def get_document(
-            self, document_id: int, current_user: UserResponse | None  # 参数：文档ID，当前用户
+            self, document_id: int  # 参数：文档ID
     ) -> SourceDocumentResponse:  # 返回值：文档响应对象
         # 从数据库获取文档
-        document = await self.repository.get_by_id(document_id, current_user)  # 调用仓库获取方法
+        document = await self.repository.get_by_id(document_id)  # 调用仓库获取方法
         # 转换为响应对象并返回
         return SourceDocumentResponse.model_validate(document)  # 模型验证转换
 
@@ -180,14 +188,13 @@ class SourceDocumentService:
             order_by: str | None,  # 参数：排序字段
             limit: int,  # 参数：限制数量
             offset: int,  # 参数：偏移量
-            current_user: UserResponse | None,  # 参数：当前用户
     ) -> list[SourceDocumentResponse]:  # 返回值：文档响应对象列表
         # 从数据库获取文档列表
         documents = await self.repository.get_all(  # 调用仓库获取所有文档
             order_by=order_by,  # 排序字段
             limit=limit,  # 限制数量
             offset=offset,  # 偏移量
-            current_user=current_user,  # 当前用户
+
         )
         # 转换为响应对象列表并返回
         return [
@@ -195,13 +202,13 @@ class SourceDocumentService:
         ]
 
     # 异步方法：删除文档
-    async def delete_document(self, document_id: int, current_user: UserResponse | None) -> None:  # 参数：文档ID，当前用户，无返回值
+    async def delete_document(self, document_id: int) -> None:  # 参数：文档ID，当前用户，无返回值
         # 先删除数据库记录
         document = await self.get_document(  # 获取文档信息
-            document_id=document_id, current_user=current_user  # 文档ID和用户
+            document_id=document_id
         )
         # 从数据库删除记录
-        await self.repository.delete(document.id, current_user)  # 调用仓库删除方法
+        await self.repository.delete(document.id)  # 调用仓库删除方法
         # 记录删除日志
         logger.info(f"Deleted document record {document_id} from database")  # 记录删除操作
 
@@ -227,11 +234,10 @@ class SourceDocumentService:
             )
 
     # 异步方法：下载文档文件
-    async def download_document(self, document_id: int, current_user: UserResponse | None):  # 参数：文档ID，当前用户，返回值：流式响应对象
+    async def download_document(self, document_id: int):  # 参数：文档ID，当前用户，返回值：流式响应对象
         # 获取文档信息，验证用户权限
         document = await self.get_document(  # 调用get_document方法验证权限
             document_id=document_id,  # 文档ID参数
-            current_user=current_user  # 当前用户参数
         )
 
         try:
@@ -279,12 +285,11 @@ class SourceDocumentService:
 
     # 异步方法：获取预签名URL
     async def get_presigned_url(
-            self, document_id: int, current_user: UserResponse | None  # 参数：文档ID，当前用户
+            self, document_id: int  # 参数：文档ID
     ) -> PresignedUrlResponse:  # 返回值：预签名URL响应对象
         # 获取文档信息，验证用户权限
         document = await self.get_document(  # 调用get_document方法验证权限
             document_id=document_id,  # 文档ID参数
-            current_user=current_user  # 当前用户参数
         )
         # 设置URL过期时间（24小时，单位：秒）
         expires_in = 60 * 60 * 24  # 24小时的秒数：86400秒
@@ -332,11 +337,10 @@ class SourceDocumentService:
     async def update_document_processing_info(
             self,
             document_id: int,  # 参数：文档ID，要更新的文档标识符
-            current_user: UserResponse | None, # 当前用户参数
-            status: str | None=None,  # 参数：文档状态，如"processing"、"completed"、"failed"
-            processed_at: datetime | None=None,  # 参数：处理完成时间，UTC时间戳
-            number_of_chunks: int | None=None,  # 参数：文本分块数量，文档被分割的块数
-            error_message: str | None=None,  # 参数：错误信息，处理失败时的详细描述
+            status: str | None = None,  # 参数：文档状态，如"processing"、"completed"、"failed"
+            processed_at: datetime | None = None,  # 参数：处理完成时间，UTC时间戳
+            number_of_chunks: int | None = None,  # 参数：文本分块数量，文档被分割的块数
+            error_message: str | None = None,  # 参数：错误信息，处理失败时的详细描述
             set_processed_now: bool = False,  # 参数：便捷标志，是否自动设置处理时间为当前时间
 
     ) -> SourceDocumentResponse:  # 返回值：更新后的文档响应对象
@@ -357,7 +361,7 @@ class SourceDocumentService:
         try:  # 尝试执行数据库更新操作
             # 调用仓库层更新文档记录
             updated_document = await self.repository.update(  # 执行数据库更新
-                data=update_payload, document_id=document_id, current_user=current_user  # 更新数据和文档ID
+                data=update_payload, document_id=document_id # 更新数据和文档ID
             )
             # 记录成功更新的日志
             logger.info(f"成功更新文档 ID: {document_id} 的处理信息")  # 记录操作成功信息

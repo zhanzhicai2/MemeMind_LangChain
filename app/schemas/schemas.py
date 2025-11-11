@@ -29,16 +29,18 @@ from typing import Any
 # Field: 字段定义装饰器，用于添加验证规则和元数据
 from pydantic import BaseModel, ConfigDict, Field
 
-
+# ===================================================================
 # 配置基类：启用 ORM 模式，支持从数据库模型创建Pydantic模型
+# ===================================================================
 class BaseSchema(BaseModel):
     # 配置模型允许从属性（ORM模型字段）创建实例
     # from_attributes=True 允许从SQLAlchemy模型直接创建Pydantic模型
     model_config = ConfigDict(from_attributes=True)
 
-
+# ===================================================================
 # 用户数据模式：定义用户相关数据的结构和验证规则
-class UserSchema(BaseSchema):
+# ===================================================================
+class UserRead(BaseSchema):
     # 用户ID：整数类型，必填字段
     id: int  # 对应数据库中的用户主键ID
 
@@ -70,13 +72,15 @@ class UserSchema(BaseSchema):
         description="用户信息最后更新时间，UTC时间戳"  # 字段描述
     )
 
-
+# ===================================================================
 # 用户响应模式：用于API返回用户数据，继承自UserSchema
-class UserResponse(UserSchema):
+# ===================================================================
+class UserResponse(UserRead):
     pass  # 继承UserSchema的所有字段，无需额外定义
 
-
+# ===================================================================
 # 用户更新模式：用于用户信息更新请求，只包含可更新的字段
+# ===================================================================
 class UserUpdateSchema(BaseSchema):
     # 用户名：字符串类型，必填字段，包含长度验证
     username: str = Field(
@@ -95,7 +99,9 @@ class UserUpdateSchema(BaseSchema):
     )
 
 
+# ===================================================================
 # 附件基础模式：定义附件数据的基本结构和验证规则
+# ===================================================================
 class SourceDocumentBase(BaseSchema):
     # MinIO对象名称：字符串类型，必填字段
     object_name: str = Field(
@@ -131,29 +137,21 @@ class SourceDocumentBase(BaseSchema):
         description="文件大小，以字节为单位，例如：1024表示1KB"  # 大小单位说明
     )
 
-
+# ===================================================================
+# 附件创建模型：用于创建新附件记录的请求模型，继承自AttachmentBase
+# ===================================================================
 class SourceDocumentCreate(SourceDocumentBase):
     pass
 
 
-# 创建附件时的请求模型：继承自AttachmentBase，用于文件上传请求
+# ===================================================================
+# 更新附件时的请求模型：继承自AttachmentBase，用于文件上传请求
+# ===================================================================
 class SourceDocumentUpdate(BaseSchema):
-    status: str | None = Field(
-        ...,
-        description="文件状态"
-    )
-    processed_at: datetime | None = Field(
-        ...,
-        description="处理时间"
-    )
-    error_message: str | None = Field(
-        ...,
-        description="错误信息"
-    )
-    number_of_chunks: int | None = Field(
-        ...,
-        description="分块数量"
-    )
+    status: str | None = Field(None, description="文件状态")
+    processed_at: datetime | None = Field(None, description="处理时间")
+    error_message: str | None = Field(None, description="错误信息")
+    number_of_chunks: int | None = Field(None, description="分块数量")
 
 
 # 附件响应模型：用于API返回附件的完整信息，包含数据库字段
@@ -163,25 +161,20 @@ class SourceDocumentResponse(SourceDocumentBase):
         ...,  # 必填字段
         description="数据库中的附件主键ID，用于唯一标识附件记录"  # ID用途说明
     )
-
-    owner_id: int | None = Field(
-        ...,
-        description="所属用户ID"
-    )
     status: str = Field(
         ...,
         description="文件状态"
     )
     processed_at: datetime | None = Field(
-        ...,
+        None,
         description="处理时间"
     )
     error_message: str | None = Field(
-        ...,
+        None,
         description="错误信息"
     )
     number_of_chunks: int | None = Field(
-        ...,
+        None,
         description="分块数量"
     )
 
@@ -200,50 +193,25 @@ class SourceDocumentResponse(SourceDocumentBase):
 
 # 预签名URL响应模式：用于返回MinIO预签名上传URL的响应数据
 class PresignedUrlResponse(BaseModel):
-    # 预签名URL：字符串类型，必填字段
-    url: str = Field(
-        ...,  # 必填字段
-        description="MinIO生成的预签名URL，用于直接上传文件到对象存储，包含签名信息和过期时间"  # URL用途详细说明
-    )
-
-    # 附件ID：整数类型，必填字段
-    attachment_id: int = Field(
-        ...,  # 必填字段
-        description="数据库中的附件记录ID，用于关联上传完成后的文件信息"  # ID关联说明
-    )
-
-    # 附件大小：整数类型，必填字段
-    size: int = Field(
-        ...,  # 必填字段
-        description="预期的文件大小（字节），用于在上传时验证文件大小是否匹配"  # 大小验证说明
-    )
-
-    # 文件内容类型：字符串类型，必填字段
-    content_type: str = Field(
-        ...,  # 必填字段
-        description="文件的MIME类型，用于在上传时设置正确的Content-Type头部"  # MIME类型用途说明
-    )
-
-    # 文件名：字符串类型，必填字段
-    filename: str = Field(
-        ...,  # 必填字段
-        description="原始文件名，用于在前端显示和后续文件管理"  # 文件名用途说明
-    )
-
-    # URL过期时间：日期时间类型，必填字段
-    expires_at: datetime = Field(
-        ...,  # 必填字段
-        description="预签名URL的过期时间，超过此时间URL将失效，通常设置为短期有效（如15分钟）"  # 过期时间说明
-    )
+    url: str
+    expires_at: datetime
+    filename: str
+    content_type: str
+    size: int
+    attachment_id: int
 
 
-# --- TextChunk Pydantic Models ---
+# ===================================================================
+# TextChunk 相关模型
+# ===================================================================
+
+# TextChunkBase Pydantic Model 文本块基础模型
 class TextChunkBase(BaseSchema):
     """TextChunk 基础模型，包含通用字段。"""
     chunk_text: str = Field(..., description="文本块的实际内容") # 文本块的实际内容
     sequence_in_document: int = Field(..., ge=0, description="文本块在原文档中的顺序编号，从0开始") # 文本块在原文档中的顺序编号，从0开始
     metadata_json: dict[str, Any] | None = Field(None, description="与文本块相关的其他元数据，例如页码、章节等") # 与文本块相关的其他元数据，例如页码、章节等
-
+# TextChunkCreate Pydantic Model 文本块创建模型
 class TextChunkCreate(TextChunkBase):
     """
         用于创建新 TextChunk 记录的模型。
@@ -252,7 +220,7 @@ class TextChunkCreate(TextChunkBase):
         """
     source_document_id: int = Field(..., description="关联的源文档ID")
     # chunk_text, sequence_in_document, metadata_json 继承自 TextChunkBase
-
+# TextChunkUpdate Pydantic Model 文本块更新模型
 class TextChunkUpdate(BaseSchema):
     """
     用于更新现有 TextChunk 记录的模型 (可选)。
@@ -262,6 +230,7 @@ class TextChunkUpdate(BaseSchema):
     chunk_text: str | None = Field(None, description="更新后的文本块内容")
     metadata_json: dict[str, Any] | None = Field(None, description="更新后的元数据")
 
+# TextChunkResponse Pydantic Model 文本块响应模型
 class TextChunkResponse(TextChunkBase):
     """
     用于 API 响应或内部数据表示的 TextChunk 模型。
@@ -273,3 +242,47 @@ class TextChunkResponse(TextChunkBase):
     updated_at: datetime = Field(..., description="记录最后更新时间")
     # 如果需要，可以在这里添加关联的 SourceDocument 的摘要信息 (需要嵌套 Pydantic 模型)
     # source_document: Optional[SourceDocumentInfo] = None # 例如
+
+# ===================================================================
+#     Message 相关模型 (全新补充)
+# ===================================================================
+
+# 与 SQLAlchemy 模型中的 Enum 保持一致，用于数据验证
+class MessageAuthor(str, enum.Enum):
+    USER = "user"
+    BOT = "bot"
+
+# 基础模型，包含通用字段
+class MessageBase(BaseSchema):
+    """
+    Message 基础模型，包含通用字段。
+    """
+    author: MessageAuthor = Field(..., description="消息作者 (user 或 bot)")
+    content: str = Field(..., description="消息内容 (用户的问题或模型的回答)")
+
+# 创建模型，包含创建时需要的字段
+class MessageCreate(MessageBase):
+    """
+    用于在数据库中创建新 Message 记录的模型。
+    """
+    response_to_id: int | None = Field(None, description="当作者是bot时，此字段指向对应用户消息的ID")
+    retrieved_chunk_ids: list[int] | None = Field(None,
+                                                  description="当作者是bot时，此字段存储用于生成回答的文本块ID列表")
+
+# 更新模型，包含更新时需要的字段
+class MessageUpdate(BaseSchema):
+    """
+    用于更新现有 Message 记录的模型 (非常规操作)。
+    通常聊天记录不应被修改。
+    """
+    content: str | None = Field(None, description="更新后的消息内容")
+
+# 响应模型，包含从数据库读取的完整信息
+class MessageResponse(MessageBase):
+    """
+    用于 API 响应或内部数据表示的 Message 模型。
+    """
+    id: int = Field(..., description="消息的唯一ID")
+    response_to_id: int | None = Field(None, description="如果此消息是回答，则为对应问题的ID")
+    retrieved_chunk_ids: list[int] | None = Field(None, description="用于生成此回答的上下文文本块ID")
+    created_at: datetime = Field(..., description="消息创建时间")

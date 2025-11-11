@@ -18,43 +18,45 @@ from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
 from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
 from MemeMind_LangChain.app.text_chunk.service import TextChunkService
 
-
-
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
 
 
 # 依赖注入 QueryService
 def get_query_service(db: AsyncSession = Depends(get_db)) -> QueryService:
     text_chunk_repo = TextChunkRepository(db)  # 初始化文本块仓库
-    text_chunk_service_instance = TextChunkService(text_chunk_repo) # 初始化文本块服务
-    return QueryService(text_chunk_service=text_chunk_service_instance) # 返回查询服务实例
+    text_chunk_service_instance = TextChunkService(text_chunk_repo)  # 初始化文本块服务
+    return QueryService(text_chunk_service=text_chunk_service_instance)  # 返回查询服务实例
+
 
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
 
-class AskQueryRequest(BaseModel): # 用于接收问答请求
+
+class AskQueryRequest(BaseModel):  # 用于接收问答请求
     query: str
     # 可以添加 LLM 调用参数的可选字段，如果希望用户能控制
     # max_tokens: Optional[int] = 512
     # temperature: Optional[float] = 0.7
 
-class AskQueryResponse(BaseModel): # 用于返回问答结果
+
+class AskQueryResponse(BaseModel):  # 用于返回问答结果
     query: str
     answer: str
-    retrieved_context_texts: list[str] | None = None # 可选，是否返回上下文给前端
+    retrieved_context_texts: list[str] | None = None  # 可选，是否返回上下文给前端
+
 
 @router.post("/retrieve-chunks", response_model=list[TextChunkResponse])
 async def retrieve_chunks_for_query(
-        request_data: QueryRequest, # 使用请求体,
-        query_service: QueryService = Depends(get_query_service)):
+        request_data: QueryRequest,  # 使用请求体,
+        query_service: QueryService = Depends(get_query_service), ):
     """
     根据用户查询，检索相关的文本块 (用于测试检索效果)。
     """
     try:
         relevant_chunks = await query_service.retrieve_relevant_chunks(
-            query_text=request_data.query, # 用户查询文本
-            top_k_final_reranked=request_data.top_k) # 检索 top_k 个相关文本块
+            query_text=request_data.query,  # 用户查询文本
+            top_k_final_reranked=request_data.top_k)  # 检索 top_k 个相关文本块
         if not relevant_chunks:
             # 可以返回空列表，或者根据业务需求抛出 404
             # raise HTTPException(status_code=404, detail="No relevant chunks found.")
@@ -70,8 +72,8 @@ async def retrieve_chunks_for_query(
 
 @router.post("/ask", response_model=AskQueryResponse)
 async def ask_llm_question(
-    request_data: AskQueryRequest,
-    query_service: QueryService = Depends(get_query_service)
+        request_data: AskQueryRequest,
+        query_service: QueryService = Depends(get_query_service)
 ):
     """
     接收用户查询，执行 RAG 流程（检索上下文 + LLM 生成答案），并返回结果。
@@ -97,7 +99,6 @@ async def ask_llm_question(
         logger.error(f"处理问答请求时发生运行时错误: {re}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(re))
 
-    except Exception as e: # 其他未知错误
+    except Exception as e:  # 其他未知错误
         logger.error(f"查询相关文本块时出错: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")
-
