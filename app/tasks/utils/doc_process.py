@@ -24,27 +24,6 @@ from MemeMind_LangChain.app.models.models import TextChunk
 from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
 from .doc_parser import parse_and_clean_document
 
-
-# def parse_txt_bytes(file_bytes: bytes) -> str:
-#     """
-#     解析 TXT 文件字节流。
-#     """
-#     logger.info("文本格式为 TXT ，开始解析...")
-#     try:
-#         raw_text = file_bytes.decode(
-#             "utf-8"
-#         )  # 尝试 UTF-8，如果可能，考虑更灵活的编码检测
-#         logger.info(f"TXT 解析完成，提取文本长度: {len(raw_text)}")
-#         return raw_text
-#     except UnicodeDecodeError as e:
-#         logger.error(f"TXT 文件解码失败 (尝试UTF-8): {e}", exc_info=True)
-#         # 可以尝试其他常见编码或直接报错
-#         raise ValueError(f"无法解码 TXT 文件 (尝试UTF-8): {e}")
-#     except Exception as e:
-#         logger.error(f"解析 TXT 时发生错误: {e}", exc_info=True)
-#         raise ValueError(f"无法解析 TXT 文件: {e}")
-
-
 # --- 异步业务逻辑核心 ---
 async def _execute_document_processing_async(
         document_id: int, task_id_for_log: str
