@@ -271,17 +271,23 @@ with gr.Blocks(title="RAG 本地知识库应用", theme=gr.themes.Soft()) as rag
                     retrieve_query_input = gr.Textbox(
                         label="输入检索关键词", placeholder="例如：关键词", lines=2
                     )
+                    # retrieved_chunks_df = gr.DataFrame(
+                    #     label="检索到的文本块",
+                    #     interactive=False,
+                    #     wrap=True,
+                    #     column_widths=["5%", "8%", "80%", "7%"],
+                    # )
                 with gr.Column(scale=1):
                     retrieve_top_k_input = gr.Number(label="返回数量 (Top K)", value=5)
                     retrieve_button = gr.Button("执行检索", variant="primary")
                     retrieve_timer_text = gr.Textbox(label="处理耗时", interactive=False)
-                with gr.Row():
-                    retrieved_chunks_df = gr.DataFrame(
-                        label="检索到的文本块",
-                        interactive=False,
-                        wrap=True,
-                        column_widths=["5%", "8%", "80%", "7%"],
-                    )
+            with gr.Row():  # 检索结果展示区域
+                retrieved_chunks_df = gr.DataFrame(
+                    label="检索到的文本块",
+                    interactive=False,
+                    wrap=True,
+                    column_widths=["5%", "8%", "80%", "7%"],
+                )
 
     # ===================================================================
     # Gradio 事件绑定
