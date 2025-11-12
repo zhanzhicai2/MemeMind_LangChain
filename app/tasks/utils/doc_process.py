@@ -22,7 +22,7 @@ from app.text_chunk.repository import TextChunkRepository
 from app.text_chunk.service import TextChunkService
 from app.models.models import TextChunk
 from app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
-from .doc_parser import parse_and_clean_document
+from app.tasks.utils.doc_parser import parse_and_clean_document
 
 # --- 异步业务逻辑核心 ---
 async def _execute_document_processing_async(
@@ -165,14 +165,6 @@ async def _execute_document_processing_async(
             )
             chunks_texts_list = text_splitter.split_text(raw_text)
 
-            chunks_texts_list: list[str] = []
-            if len(raw_text) > chunk_size:
-                for i in range(0, len(raw_text), chunk_size - chunk_overlap):
-                    chunk = raw_text[i: i + chunk_size]
-                    chunks_texts_list.append(chunk)
-            elif raw_text:  # 如果文本不为空但小于块大小，则本身作为一个块
-                chunks_texts_list.append(raw_text)
-
             if (
                     not chunks_texts_list and raw_text
             ):  # 如果有原始文本但未能分块（逻辑问题）
@@ -239,7 +231,7 @@ async def _execute_document_processing_async(
                 )
 
             # ==================================================================
-            # 第7步：为文本块生成向量嵌入
+            # 第7步：为文本块生成向量嵌入（批量处理以避免内存不足）
             # ==================================================================
             if created_chunk_db_objects:  # 仅当有成功创建的文本块时才进行向量化
                 texts_to_embed = [
@@ -249,29 +241,54 @@ async def _execute_document_processing_async(
                 logger.info(
                     f"{task_id_for_log} (Async Logic) 开始为 {len(texts_to_embed)} 个文本块生成向量嵌入..."
                 )
-                try:
-                    # 将同步的 embedding 操作放到线程中执行，避免阻塞事件循环
-                    embeddings_list = await asyncio.to_thread(
-                        get_embeddings,
-                        texts_to_embed,
-                        task_description=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL,
-                    )
-                    logger.info(
-                        f"{task_id_for_log} (Async Logic) 成功生成 {len(embeddings_list)} 组向量嵌入。"
-                    )
-                except Exception as embed_error:
-                    logger.error(
-                        f"{task_id_for_log} (Async Logic) 生成向量嵌入失败: {embed_error}",
-                        exc_info=True,
-                    )
-                    await source_doc_service.update_document_processing_info(
-                        document_id=document_response.id,
 
-                        status="error",
-                        error_message=f"向量化失败: {str(embed_error)[:255]}",
-                        number_of_chunks=number_of_chunks_created,  # 已创建的块数量还是记录一下
+                # 批量处理以避免内存不足 - 针对MPS内存限制进一步减小批次大小
+                batch_size = 20  # 每批处理20个文本块，避免MPS内存溢出
+                all_embeddings = []
+
+                for i in range(0, len(texts_to_embed), batch_size):
+                    batch_texts = texts_to_embed[i:i + batch_size]
+                    batch_num = i // batch_size + 1
+                    total_batches = (len(texts_to_embed) + batch_size - 1) // batch_size
+
+                    logger.info(
+                        f"{task_id_for_log} (Async Logic) 处理批次 {batch_num}/{total_batches}，包含 {len(batch_texts)} 个文本块..."
                     )
-                    raise embed_error
+
+                    try:
+                        # 将同步的 embedding 操作放到线程中执行，避免阻塞事件循环
+                        batch_embeddings = await asyncio.to_thread(
+                            get_embeddings,
+                            batch_texts,
+                            task_description=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL,
+                            is_query=False,  # 文档嵌入，不是查询嵌入
+                        )
+                        all_embeddings.extend(batch_embeddings)
+
+                        logger.info(
+                            f"{task_id_for_log} (Async Logic) 批次 {batch_num} 完成，生成 {len(batch_embeddings)} 个向量。"
+                        )
+
+                        # 清理内存
+                        del batch_embeddings
+
+                    except Exception as embed_error:
+                        logger.error(
+                            f"{task_id_for_log} (Async Logic) 批次 {batch_num} 生成向量嵌入失败: {embed_error}",
+                            exc_info=True,
+                        )
+                        await source_doc_service.update_document_processing_info(
+                            document_id=document_response.id,
+                            status="error",
+                            error_message=f"向量化失败(批次{batch_num}): {str(embed_error)[:255]}",
+                            number_of_chunks=number_of_chunks_created,
+                        )
+                        raise embed_error
+
+                logger.info(
+                    f"{task_id_for_log} (Async Logic) 成功生成所有 {len(all_embeddings)} 组向量嵌入。"
+                )
+                embeddings_list = all_embeddings
 
                 # ==================================================================
                 # 第8步：将向量和文本块的关联信息存入向量数据库 (ChromaDB)

@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 """
-@File ：service.py
+@File ：source_doc/service.py
 @IDE ：PyCharm
 @Author ：zhanzhicai
 @Date ：2025/10/31 19:11
@@ -147,33 +147,44 @@ class SourceDocumentService:
             new_document = await self.repository.create(document_data)  # 调用仓库创建方法
             # 验证并转换为响应对象
             result = SourceDocumentResponse.model_validate(new_document)  # 模型验证转换
-            # 直接处理文档（使用增强文档处理器）
+            # # 直接处理文档（使用增强文档处理器） - 已注释，改用Celery
+            # try:
+            #     from app.core.enhanced_doc_processor import process_document_enhanced
+            #     import asyncio
+            #
+            #     # 在后台执行文档处理，不阻塞响应
+            #     def process_in_background():
+            #         loop = asyncio.new_event_loop()
+            #         asyncio.set_event_loop(loop)
+            #         try:
+            #             result = loop.run_until_complete(
+            #                 process_document_enhanced(new_document.id)
+            #             )
+            #             logger.info(f"文档 {new_document.id} 后台处理结果: {result}")
+            #         except Exception as e:
+            #             logger.error(f"文档 {new_document.id} 后台处理失败: {e}")
+            #         finally:
+            #             loop.close()
+            #
+            #     import threading
+            #     thread = threading.Thread(target=process_in_background)
+            #     thread.daemon = True
+            #     thread.start()
+            #
+            #     logger.info(f"文档 {new_document.id} 已在后台开始增强处理")
+            # except Exception as process_error:
+            #     logger.error(f"启动文档处理失败: {process_error}")
+
+            # 使用Celery异步处理文档
             try:
-                from app.core.enhanced_doc_processor import process_document_enhanced
-                import asyncio
+                from app.tasks.document_task import process_document_task
 
-                # 在后台执行文档处理，不阻塞响应
-                def process_in_background():
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        result = loop.run_until_complete(
-                            process_document_enhanced(new_document.id)
-                        )
-                        logger.info(f"文档 {new_document.id} 后台处理结果: {result}")
-                    except Exception as e:
-                        logger.error(f"文档 {new_document.id} 后台处理失败: {e}")
-                    finally:
-                        loop.close()
-
-                import threading
-                thread = threading.Thread(target=process_in_background)
-                thread.daemon = True
-                thread.start()
-
-                logger.info(f"文档 {new_document.id} 已在后台开始增强处理")
-            except Exception as process_error:
-                logger.error(f"启动文档处理失败: {process_error}")
+                # 提交Celery异步任务 - 使用 .delay() 方法避免事件循环冲突
+                task = process_document_task.delay(new_document.id)
+                logger.info(f"文档 {new_document.id} 已提交到Celery队列处理，任务ID: {task.id}")
+            except Exception as celery_error:
+                logger.error(f"提交Celery任务失败: {celery_error}")
+                # 如果Celery失败，可以考虑回退到同步处理或者记录错误
 
             return result  # 返回创建的文档响应
 

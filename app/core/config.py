@@ -48,8 +48,8 @@ class BaseConfig(BaseSettings):
     # Embedding 模型相关
     EMBEDDING_INSTRUCTION_FOR_RETRIEVAL: str = "为这个句子生成表示以用于检索相关文章" # 为这个句子生成表示以用于检索相关文章，嵌入模型指令，用于检索相关文章
     EMBEDDING_DIMENSIONS: int = 1024  # 嵌入维度, Qwen 0.6B为1024 Qwen 4B为2560
-    CHUNK_SIZE: int = 512 # 文本分块大小，用于处理长文本
-    CHUNK_OVERLAP: int = 50 # 文本分块重叠大小，用于保持上下文连贯性
+    CHUNK_SIZE: int = 1024 # 文本分块大小，用于处理长文本 (增大以减少总块数)
+    CHUNK_OVERLAP: int = 100 # 文本分块重叠大小，用于保持上下文连贯性 (相应增加重叠)
 
     # Reranker 相关配置
     INITIAL_RETRIEVAL_TOP_K: int = 50  # 第一阶段向量召回的数量

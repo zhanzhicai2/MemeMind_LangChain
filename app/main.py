@@ -20,6 +20,8 @@ from app.utils.migrations import run_migrations
 from app.source_doc.routes import router as source_doc_router
 from app.query.routes import router as query_router
 from app.ui.gradio_interface import rag_demo_ui
+from app.core.celery_app import celery_app  # 导入Celery应用
+from app.celery.routes import router as celery_router  # 导入Celery监控路由
 
 from loguru import logger
 from app.core.logging import setup_logging
@@ -69,6 +71,7 @@ app.add_middleware(
 
 app.include_router(source_doc_router)
 app.include_router(query_router)
+app.include_router(celery_router)  # 添加Celery监控路由
 # 挂载 Gradio 界面
 # vvv 关键的一行：将 Gradio 应用挂载到 FastAPI vvv
 # 这会在您的应用下创建一个 /gradio 路径，用于展示 UI 界面
