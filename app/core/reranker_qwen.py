@@ -12,12 +12,12 @@ import torch
 from  loguru import logger
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
+from app.schemas.schemas import TextChunkResponse
 
 
 # --- 1. 修改模型常量 ---
 RERANKER_MODEL_NAME = "Qwen/Qwen3-Reranker-0.6B"
-RERANKER_MODEL_PATH = "app/embeddings/Qwen3-Reranker-0.6B"
+RERANKER_MODEL_PATH = "app/embeddings/Qwen/Qwen3-Reranker-0.6B"
 QWEN_RERANKER_MAX_LENGTH = 8192
 
 """ 下载新模型命令
@@ -90,36 +90,13 @@ def _load_reranker_model():
             token_true_id = reranker_tokenizer.convert_tokens_to_ids("yes")
             token_false_id = reranker_tokenizer.convert_tokens_to_ids("no")
 
-            # 判断设备并加载模型
-            if torch.cuda.is_available():
-                reranker_device = torch.device("cuda") # 设置模型运行设备（如GPU）
-                logger.info("检测到 CUDA，Reranker 模型将使用 GPU。")
-
-                try:
-                    reranker_model_global = AutoModelForCausalLM.from_pretrained(
-                        RERANKER_MODEL_PATH,
-                        torch_dtype=torch.float16,
-                        attn_implementation="flash_attention_2"
-                    ).to(reranker_device)
-                    logger.info("已启用 Flash Attention 2 加速。")
-                except Exception as e:
-                    logger.warning(f"加载 Flash Attention 2 失败: {e}，将使用标准模式。")
-                    reranker_model_global = AutoModelForCausalLM.from_pretrained(
-                        RERANKER_MODEL_PATH, torch_dtype=torch.float16
-                    ).to(reranker_device)
-
-            elif torch.backends.mps.is_available():
-                reranker_device = torch.device("mps") # 设置模型运行设备（如MPS）
-                logger.info("检测到 MPS，Reranker 模型将使用 MPS。")
-                reranker_model_global = AutoModelForCausalLM.from_pretrained(
-                    RERANKER_MODEL_PATH, torch_dtype=torch.float16
-                ).to(reranker_device)
-            else:
-                reranker_device = torch.device("cpu") # 设置模型运行设备（如CPU）
-                logger.info("未检测到 CUDA 或 MPS，Reranker 模型将使用 CPU。")
-                reranker_model_global = AutoModelForCausalLM.from_pretrained(
-                    RERANKER_MODEL_PATH
-                ).to(reranker_device)
+            # 强制使用 CPU 来避免 MPS 上的内存问题
+            reranker_device = torch.device("cpu") # 设置模型运行设备（如CPU）
+            logger.info("Reranker 模型将强制使用 CPU 以避免内存问题。")
+            reranker_model_global = AutoModelForCausalLM.from_pretrained(
+                RERANKER_MODEL_PATH,
+                torch_dtype=torch.float32  # 使用 float32 在 CPU 上更稳定
+            ).to(reranker_device)
 
             reranker_model_global.eval() # 设置模型为评估模式
             logger.info(f"Reranker 模型加载完成: {RERANKER_MODEL_NAME}并移至 {reranker_device}。")
@@ -147,7 +124,12 @@ def rerank_documents(query: str, documents: list[TextChunkResponse],task_instruc
         :param task_instruction:  Reranker 模型的指令，用于指定排序任务，默认值为 RERANKER_INSTRUCTION
     """
 
-    _load_reranker_model() # 加载 Reranker 模型
+    try:
+        _load_reranker_model() # 加载 Reranker 模型
+    except RuntimeError as e:
+        logger.warning(f"Reranker 模型不可用，使用原始顺序: {e}")
+        # 返回原始文档顺序，分数为1.0
+        return [(doc, 1.0) for doc in documents]
 
     if not query or not documents:
         return []

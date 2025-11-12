@@ -26,16 +26,11 @@ MemeMind是一个基于FastAPI的RAG（检索增强生成）知识库系统，
 - Qwen系列模型: 嵌入、重排、生成
 """
 
-from MemeMind_LangChain.app.main import app
-from MemeMind_LangChain.app.core.config import settings
-
 __version__ = "0.1.0"
 __author__ = "zhanzhicai"
 __description__ = "MemeMind - 本地RAG知识库系统"
 
 __all__ = [
-    "app",                    # FastAPI应用实例
-    "settings",               # 应用配置
     "__version__",           # 版本号
     "__author__",            # 作者
     "__description__",       # 应用描述

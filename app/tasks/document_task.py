@@ -1,9 +1,10 @@
 from loguru import logger
 from asgiref.sync import async_to_sync
 import asyncio
-from MemeMind_LangChain.app.core.celery_app import celery_app
-from MemeMind_LangChain.app.tasks.utils.doc_process import _execute_document_processing_async
-from MemeMind_LangChain.app.tasks.utils.query_process import execute_query_processing_async
+from app.core.celery_app import celery_app
+from app.tasks.utils.doc_process import _execute_document_processing_async
+from app.tasks.utils.query_process import execute_query_processing_async
+from app.core.enhanced_doc_processor import process_document_enhanced
 
 
 # --- Celery 同步任务入口点 ---
@@ -56,6 +57,47 @@ def process_document_task(self, document_id: int):  # bind=True后，第一个�
     finally:
         # 5. 关键步骤：这个 finally 块中的代码保证【总是】会执行。
         #    无论 try 块是成功返回、还是发生异常，都会执行这里。
+        logger.info(f"{task_id_log_prefix} 开始清理异步环境，关闭事件循环。")
+        loop.close()
+
+
+@celery_app.task(
+    name="app.tasks.document_task.process_document_enhanced_task",
+    bind=True,
+)
+def process_document_enhanced_task(self, document_id: int):
+    """
+    使用增强文档处理器的 Celery 任务，支持多种文件格式。
+
+    :param self: Celery 任务实例，用于访问任务元数据 (如任务 ID)
+    :param document_id: 要处理的文档 ID
+    :return: 处理结果，通常是处理状态或处理后的文档 ID
+    """
+    task_id_log_prefix = f"[Enhanced Celery Task ID: {self.request.id}]"
+    logger.info(
+        f"{task_id_log_prefix} 接收到文档 ID: {document_id}。使用增强处理器处理。"
+    )
+
+    # 1. 创建全新的事件循环，并设置为当前线程的循环
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # 2. 使用增强的文档处理器
+        result = loop.run_until_complete(
+            process_document_enhanced(document_id)
+        )
+        logger.info(f"{task_id_log_prefix} 增强处理器异步逻辑成功完成，结果: {result}")
+        return result
+    except Exception as e:
+        logger.error(
+            f"{task_id_log_prefix} 增强处理器异步逻辑中发生致命错误: {e}",
+            exc_info=True,
+        )
+        # 重新抛出异常，这对于 Celery 至关重要
+        raise
+    finally:
+        # 5. 关键步骤：这个 finally 块中的代码保证【总是】会执行
         logger.info(f"{task_id_log_prefix} 开始清理异步环境，关闭事件循环。")
         loop.close()
 

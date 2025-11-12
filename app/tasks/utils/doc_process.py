@@ -11,17 +11,17 @@ import asyncio
 from loguru import logger
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.s3_client import s3_client
-from MemeMind_LangChain.app.core.database import create_engine_and_session_for_celery
-from MemeMind_LangChain.app.core.embedding_qwen import get_embeddings
-from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
-from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepository
-from MemeMind_LangChain.app.source_doc.service import SourceDocumentService
-from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
-from MemeMind_LangChain.app.text_chunk.service import TextChunkService
-from MemeMind_LangChain.app.models.models import TextChunk
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
+from app.core.config import settings
+from app.core.s3_client import s3_client
+from app.core.database import create_engine_and_session_for_celery
+from app.core.embedding_qwen import get_embeddings
+from app.core.chromadb_client import get_chroma_collection
+from app.source_doc.repository import SourceDocumentRepository
+from app.source_doc.service import SourceDocumentService
+from app.text_chunk.repository import TextChunkRepository
+from app.text_chunk.service import TextChunkService
+from app.models.models import TextChunk
+from app.schemas.schemas import SourceDocumentResponse, TextChunkCreate
 from .doc_parser import parse_and_clean_document
 
 # --- 异步业务逻辑核心 ---

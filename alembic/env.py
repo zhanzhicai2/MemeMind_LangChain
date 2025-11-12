@@ -6,12 +6,12 @@ from sqlalchemy import Connection
 from sqlalchemy import pool
 
 from alembic import context
-from MemeMind_LangChain.app.models.models import Base
+from app.models.models import Base
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # 加载环境变量
 POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "12345678")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "mememind")
@@ -23,7 +23,8 @@ DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTG
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
+# set_main_option作用是什么：设置 sqlalchemy.url 选项，用于指定数据库连接 URL，
+# 第一个参数是选项名，第二个参数是选项值，这里是数据库连接 URL
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.

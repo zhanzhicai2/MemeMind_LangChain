@@ -13,15 +13,19 @@ from typing import Optional
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from MemeMind_LangChain.app.core.config import settings
+from app.core.config import settings
 
 # --- 全局变量，用于存储加载后的模型和分词器 ---
 llm_model: Optional[AutoModelForCausalLM] = None
 llm_tokenizer: Optional[AutoTokenizer] = None
-# --- 模型配置 ---
-LLM_MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
-LLM_MODEL_PATH = "app/llm_models/Qwen2.5-1.5B-Instruct"
 
+# ---源代码 需要到modelscope魔塔社区下载模型配置 modelscope download --model Qwen/Qwen2.5-1.5B-Instruct---
+LLM_MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+LLM_MODEL_PATH = "app/llm_models/Qwen/Qwen2.5-1.5B-Instruct"
+
+# --- 模型配置 ---
+# LLM_MODEL_NAME = "qwen3:4b"
+# LLM_MODEL_PATH = "http://localhost:11434/v1/chat/completions"
 
 def _load_llm_model() -> None:
     """
@@ -36,17 +40,17 @@ def _load_llm_model() -> None:
             model_path = Path(LLM_MODEL_PATH)
             if not model_path.exists():
                 raise FileNotFoundError(f"模型路径不存在: {model_path.absolute()}")
-            # 2. 根据官方文档，使用 torch_dtype="auto" 进行更智能的类型选择
+            # 2. 强制使用 CPU 来避免 MPS 上的 BFloat16 兼容性问题
             llm_model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype="auto",  # 自动选择合适的 dtype
-                device_map="auto",  # 自动将模型分布到可用的设备上
+                torch_dtype=torch.float32,  # 使用 float32 在 CPU 上更稳定
+                device_map="cpu",  # 强制使用 CPU
             )
             llm_tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_PATH)
             # 将模型设置为评估模式
             llm_model.eval()
             device = next(llm_model.parameters()).device
-            logger.info(f"LLM 模型 {LLM_MODEL_NAME} 加载成功。GPU层数: {settings.LLM_N_GPU_LAYERS}，设备: {device}")
+            logger.info(f"LLM 模型 {LLM_MODEL_NAME} 加载成功。设备: {device}")
         except Exception as e:
             logger.error(f"加载 LLM 模型 {LLM_MODEL_NAME} 失败: {e}", exc_info=True)
             raise RuntimeError(f"无法加载 LLM 模型: {LLM_MODEL_NAME}") from e

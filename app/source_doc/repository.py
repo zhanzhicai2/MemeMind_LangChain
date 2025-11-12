@@ -19,13 +19,13 @@ from sqlalchemy.exc import IntegrityError  # 数据库完整性错误异常
 from sqlalchemy.ext.asyncio import AsyncSession  # 异步数据库会话
 
 # 导入应用核心模块
-from MemeMind_LangChain.app.core.exceptions import AlreadyExistsException, NotFoundException  # 自定义异常
+from app.core.exceptions import AlreadyExistsException, NotFoundException  # 自定义异常
 
 # 导入数据模型
-from MemeMind_LangChain.app.models.models import SourceDocument  # 源文档数据模型
+from app.models.models import SourceDocument  # 源文档数据模型
 
 # 导入数据模式
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate  # 文档数据模式
+from app.schemas.schemas import SourceDocumentCreate, SourceDocumentUpdate  # 文档数据模式
 
 
 # 源文档数据仓库类：提供数据库操作接口
@@ -66,13 +66,13 @@ class SourceDocumentRepository:
 
     async def get_by_id(self, document_id: int) -> SourceDocument:
         """
-        更新文档记录
+        获取文档记录
         :param document_id:
-        :return: 更新后的文档记录
+        :return: 文档记录
         """
         query = select(SourceDocument).where(SourceDocument.id == document_id)
         result = await self.session.execute(query)
-        document = result.one_or_none()
+        document = result.scalar_one_or_none()
         if not document:
             raise NotFoundException(f"文档{document_id} 不存在")
         return document

@@ -26,15 +26,15 @@ from fastapi import UploadFile, File  # 文件上传和文件对象
 from starlette.responses import StreamingResponse  # 流式响应
 
 # 导入应用核心模块
-from MemeMind_LangChain.app.core.database import get_db  # 数据库依赖获取函数
+from app.core.database import get_db  # 数据库依赖获取函数
 
 # 导入数据模式和响应模型
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse, PresignedUrlResponse  # 文档响应和预签名URL响应
-from MemeMind_LangChain.app.schemas.param_schemas import DocumentQueryParams  # 文档查询参数
+from app.schemas.schemas import SourceDocumentResponse, PresignedUrlResponse  # 文档响应和预签名URL响应
+from app.schemas.param_schemas import DocumentQueryParams  # 文档查询参数
 
 # 导入文档服务层和数据仓库层
-from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepository  # 文档数据仓库
-from MemeMind_LangChain.app.source_doc.service import SourceDocumentService  # 文档服务层
+from app.source_doc.repository import SourceDocumentRepository  # 文档数据仓库
+from app.source_doc.service import SourceDocumentService  # 文档服务层
 
 # 创建API路由器实例，设置前缀和标签
 router = APIRouter(prefix="/documents", tags=["Documents"])  # 所有文档相关路由的前缀为/document，用于API文档分组

@@ -17,13 +17,11 @@
 创建时间和更新时间字段。
 """
 
-from MemeMind_LangChain.app.models.models import (
+from app.models.models import (
     Base,                    # SQLAlchemy声明基类
     DateTimeMixin,          # 日期时间混入类
-    User,                   # 用户模型
     SourceDocument,         # 源文档模型
     TextChunk,              # 文本块模型
-    Conversation,           # 对话模型
     Message,                # 消息模型
     MessageAuthor,          # 消息作者枚举
 )
@@ -31,10 +29,8 @@ from MemeMind_LangChain.app.models.models import (
 __all__ = [
     "Base",                 # SQLAlchemy声明基类
     "DateTimeMixin",       # 日期时间混入类
-    "User",                # 用户模型
     "SourceDocument",      # 源文档模型
     "TextChunk",           # 文本块模型
-    "Conversation",        # 对话模型
     "Message",             # 消息模型
     "MessageAuthor",       # 消息作者枚举
 ]

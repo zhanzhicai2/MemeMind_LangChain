@@ -14,8 +14,8 @@ from typing import AsyncGenerator, Optional
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
 from sqlalchemy.orm import sessionmaker
 
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.models.models import Base
+from app.core.config import settings
+from app.models.models import Base
 
 # --- 1. 全局变量定义 ---
 # 将原来的直接创建，改为先定义变量并初始化为 None。
@@ -80,7 +80,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     if SessionLocal is None:
         raise Exception("数据库未初始化。请检查 FastAPI 的 lifespan 配置。")
 
-    async with SessionLocal as session:
+    async with SessionLocal() as session:
         yield session
 
 # --- 4. Celery 专属的工厂函数 ---

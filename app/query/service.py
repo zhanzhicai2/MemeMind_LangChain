@@ -10,13 +10,13 @@ import asyncio
 from typing import Any
 
 from loguru import logger
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
-from MemeMind_LangChain.app.core.embedding_qwen import get_embeddings
-from MemeMind_LangChain.app.core.llm_service import generate_text_from_llm
-from MemeMind_LangChain.app.core.reranker_qwen import rerank_documents
-from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
-from MemeMind_LangChain.app.text_chunk.service import TextChunkService
+from app.core.config import settings
+from app.core.chromadb_client import get_chroma_collection
+from app.core.embedding_qwen import get_embeddings
+from app.core.llm_service import generate_text_from_llm
+from app.core.reranker_qwen import rerank_documents
+from app.schemas.schemas import TextChunkResponse
+from app.text_chunk.service import TextChunkService
 
 
 class QueryService:
@@ -177,12 +177,13 @@ class QueryService:
             logger.info(f"Rerank 完成，最终选取 {len(final_top_n_chunks)} 个文本块。")
             return final_top_n_chunks
 
-
         except ValueError as e:
             logger.error(f"Reranking 过程中发生错误: {e}", exc_info=True)
-            # 如果 Rerank 失败，是返回初步召回的结果还是空列表？通常可能是空列表或抛出异常
-            # 这里我们选择返回空列表，或者你可以选择返回 initial_retrieved_chunks 的前N个作为降级方案
-            return []  # 或者向上抛出 HTTPException
+            # 如果 Rerank 失败，使用初步召回的结果作为降级方案
+            logger.warning(f"Reranker 失败，使用初步召回的 top {top_k_final_reranked} 个结果")
+            final_top_n_chunks = candidate_chunks[:top_k_final_reranked]
+            logger.info(f"降级方案完成，返回 {len(final_top_n_chunks)} 个文本块。")
+            return final_top_n_chunks
 
     async def get_context_for_llm(self, query_text: str) -> list[str]:
         """

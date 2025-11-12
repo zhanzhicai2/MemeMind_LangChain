@@ -28,16 +28,16 @@ class BaseConfig(BaseSettings):
 
     # RabbitMQ 配置
     RABBITMQ_HOST: str = "localhost:5672"
-    RABBITMQ_USER: str = "user"
-    RABBITMQ_PASSWORD: str = "12345678"
+    RABBITMQ_USER: str = "admin"
+    RABBITMQ_PASSWORD: str = "admin123"
 
     # Redis 配置
     REDIS_HOST: str = "localhost:6379"
 
     # S3/MinIO 配置
     MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minio"
-    MINIO_SECRET_KEY: str = "miniosecret"
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_USE_SSL: bool = False
     MINIO_BUCKET: str = "mememind"
 

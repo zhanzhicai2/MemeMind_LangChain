@@ -15,9 +15,9 @@ from botocore.exceptions import ClientError # 导入MinIO客户端异常类，�
 # 导入boto3库，AWS SDK for Python，用于操作MinIO
 import boto3
 # 导入应用配置，获取MinIO连接参数
-from MemeMind_LangChain.app import settings
+from app.core.config import settings
 # 导入自定义异常类，处理权限相关错误
-from MemeMind_LangChain.app.core.exceptions import ForbiddenException
+from app.core.exceptions import ForbiddenException
 # 导入日志记录器，用于记录操作日志
 from loguru import logger
 # 导入AWS客户端配置类，用于配置S3客户端参数

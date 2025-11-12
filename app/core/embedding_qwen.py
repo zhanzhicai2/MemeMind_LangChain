@@ -18,8 +18,11 @@ from transformers import AutoTokenizer, AutoModel
 # --- 1. 修改模型名称和路径 ---
 # 新模型的 Hugging Face 名称
 EMBEDDING_MODEL_NAME = "Qwen/Qwen3-Embedding-0.6B"
-# 建议为新模型创建一个新的本地路径
-EMBEDDING_MODEL_PATH = "app/embeddings/Qwen3-Embedding-0.6B"
+# EMBEDDING_MODEL_PATH = "app/embeddings/Qwen/Qwen3-Embedding-0.6B"
+
+# 建议为新模型创建一个新的本地路径 - 使用绝对路径
+import os
+EMBEDDING_MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "embeddings", "Qwen", "Qwen3-Embedding-0.6B")
 # 新模型的最大长度
 QWEN_MAX_LENGTH = 8192
 
@@ -97,9 +100,9 @@ def _load_embedding_model():
             elif torch.backends.mps.is_available():
                 device = torch.device("mps")
                 logger.info("检测到 MPS (Apple Silicon GPU)，Embedding 模型将使用 MPS。")
-                # Apple Silicon 不支持 Flash Attention，但可以使用 bfloat16
+                # Apple Silicon 不支持 Flash Attention 和 BFloat16，使用 float32
                 embedding_model_global = AutoModel.from_pretrained(
-                    model_path, torch_dtype=torch.bfloat16
+                    model_path, torch_dtype=torch.float32
                 ).to(device)
             else:
                 device = torch.device("cpu")

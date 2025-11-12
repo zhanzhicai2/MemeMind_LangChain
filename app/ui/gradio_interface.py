@@ -30,7 +30,7 @@ async def call_ask_api(query_text: str):
     :return: 包含回答和参考资料的格式化字符串
     """
     if not query_text or not query_text.strip():
-        return "请输入问题后再提交。"
+        return "请输入问题后再提交。", "请输入问题"
 
     t0 = time.monotonic()  # 记录开始时间
     # API 端点的完整 URL
@@ -67,7 +67,8 @@ async def call_ask_api(query_text: str):
             return formatted_output, duration_str
     except Exception as e:
         logger.error(f"调用问答 API 时发生错误: {e}", exc_info=True)
-        return f"处理问答请求时出错: {e}"
+        error_message = f"处理问答请求时出错: {e}"
+        return error_message, "处理失败"
 
 # ===================================================================
 # 文档获取管理模块的桥梁函数
@@ -177,7 +178,7 @@ async def retrieve_chunks_bridge(query: str, top_k: int):
     """【检索测试】的桥梁函数"""
     if not query or not query.strip():
         gr.Warning("请输入检索关键词！")
-        return None  # 返回 None 以保持输出区域不变
+        return pd.DataFrame(columns=["ID", "来源文档ID", "文本块内容", "顺序"]), "请输入检索关键词"
     t0 = time.monotonic()  # 记录开始时间
     api_url = f"{FASTAPI_BASE_URL}/query/retrieve-chunks"
     payload = {"query": query, "top_k": int(top_k)}
@@ -212,7 +213,7 @@ async def retrieve_chunks_bridge(query: str, top_k: int):
         error_message = f"检索文本块时出错: {e}"
         logger.error(error_message, exc_info=True)
         gr.Error(error_message)
-        return pd.DataFrame(columns=["ID", "来源文档ID", "文本块内容", "顺序"])
+        return pd.DataFrame(columns=["ID", "来源文档ID", "文本块内容", "顺序"]), "检索失败"
 
 # ===================================================================
 # Gradio UI 界面定义
@@ -294,7 +295,7 @@ with gr.Blocks(title="RAG 本地知识库应用", theme=gr.themes.Soft()) as rag
     ask_submit_button.click(
         fn=call_ask_api,
         inputs=[question_input],
-        outputs=[answer_output]
+        outputs=[answer_output, ask_timer_text]
     )
 
     # 文档管理选项卡的事件

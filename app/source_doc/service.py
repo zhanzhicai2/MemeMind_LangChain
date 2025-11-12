@@ -30,16 +30,15 @@ from datetime import datetime, timedelta, timezone  # 日期时间处理
 
 # 导入应用核心模块
 from loguru import logger  # 日志记录器
-from MemeMind_LangChain.app.core.config import settings  # 应用配置
-from MemeMind_LangChain.app.core.s3_client import s3_client  # MinIO S3客户端
-from MemeMind_LangChain.app.core.celery_app import celery_app  # Celery异步任务队列
-from MemeMind_LangChain.app.core.exceptions import NotFoundException, ForbiddenException  # 自定义异常
+from app.core.config import settings  # 应用配置
+from app.core.s3_client import s3_client  # MinIO S3客户端
+from app.core.exceptions import NotFoundException, ForbiddenException  # 自定义异常
 
 # 导入数据访问层
-from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepository  # 文档数据仓库
+from app.source_doc.repository import SourceDocumentRepository  # 文档数据仓库
 
 # 导入数据模式
-from MemeMind_LangChain.app.schemas.schemas import (  # Pydantic数据模式
+from app.schemas.schemas import (  # Pydantic数据模式
     SourceDocumentCreate,  # 文档创建模式
     SourceDocumentUpdate,  # 文档更新模式
     SourceDocumentResponse,  # 文档响应模式
@@ -148,12 +147,34 @@ class SourceDocumentService:
             new_document = await self.repository.create(document_data)  # 调用仓库创建方法
             # 验证并转换为响应对象
             result = SourceDocumentResponse.model_validate(new_document)  # 模型验证转换
-            # 发送异步文档处理任务
-            celery_app.send_task(
-                "app.tasks.document_task.process_document_task",  # 任务名称
-                args=[new_document.id],  # 参数：文档ID
-                task_id=f"process_document_task_{new_document.id}",  # 任务ID
-            )
+            # 直接处理文档（使用增强文档处理器）
+            try:
+                from app.core.enhanced_doc_processor import process_document_enhanced
+                import asyncio
+
+                # 在后台执行文档处理，不阻塞响应
+                def process_in_background():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(
+                            process_document_enhanced(new_document.id)
+                        )
+                        logger.info(f"文档 {new_document.id} 后台处理结果: {result}")
+                    except Exception as e:
+                        logger.error(f"文档 {new_document.id} 后台处理失败: {e}")
+                    finally:
+                        loop.close()
+
+                import threading
+                thread = threading.Thread(target=process_in_background)
+                thread.daemon = True
+                thread.start()
+
+                logger.info(f"文档 {new_document.id} 已在后台开始增强处理")
+            except Exception as process_error:
+                logger.error(f"启动文档处理失败: {process_error}")
+
             return result  # 返回创建的文档响应
 
         except Exception as e:  # 捕获数据库操作异常

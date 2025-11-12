@@ -14,7 +14,7 @@
 包括数据库迁移、系统初始化、辅助函数等。
 """
 
-from MemeMind_LangChain.app.utils.migrations import (
+from app.utils.migrations import (
     run_migrations,           # 执行数据库迁移
     create_initial_data,      # 创建初始数据
     check_migration_status,   # 检查迁移状态

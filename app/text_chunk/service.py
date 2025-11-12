@@ -6,8 +6,8 @@
 @Date ：2025/11/4 18:12
 @DOC: 
 """
-from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
-from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate, TextChunkResponse
+from app.text_chunk.repository import TextChunkRepository
+from app.schemas.schemas import TextChunkCreate, TextChunkResponse
 from loguru import logger
 
 

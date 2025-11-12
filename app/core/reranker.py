@@ -12,7 +12,7 @@
 # from  loguru import logger
 # from transformers import AutoTokenizer, AutoModelForSequenceClassification
 #
-# from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
+# from app.schemas.schemas import TextChunkResponse
 #
 # # 模型名称或本地路径 ，如果是本地路径，需要确保模型文件存在
 # # TODO: 确认模型文件是否存在

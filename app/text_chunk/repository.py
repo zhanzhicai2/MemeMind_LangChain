@@ -11,8 +11,8 @@ from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from MemeMind_LangChain.app.models.models import TextChunk
-from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate
+from app.models.models import TextChunk
+from app.schemas.schemas import TextChunkCreate
 
 
 class TextChunkRepository:

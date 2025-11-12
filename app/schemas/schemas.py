@@ -22,6 +22,7 @@
 # 导入日期时间模块，用于处理时间戳字段
 from datetime import datetime
 from typing import Any
+import enum
 
 # 导入Pydantic相关组件：
 # BaseModel: 所有Pydantic模式的基类

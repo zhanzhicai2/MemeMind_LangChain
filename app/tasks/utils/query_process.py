@@ -12,19 +12,19 @@ from loguru import logger
 
 
 # --- 核心和工具类导入 ---
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.embedding_qwen import get_embeddings
-from MemeMind_LangChain.app.core.chromadb_client import get_chroma_collection
-from MemeMind_LangChain.app.core.reranker_qwen import rerank_documents # 假设你已创建 reranker.py 并定义了此函数
-from MemeMind_LangChain.app.core.database import create_engine_and_session_for_celery # 用于创建数据库会话
+from app.core.config import settings
+from app.core.embedding_qwen import get_embeddings
+from app.core.chromadb_client import get_chroma_collection
+from app.core.reranker_qwen import rerank_documents # 假设你已创建 reranker.py 并定义了此函数
+from app.core.database import create_engine_and_session_for_celery # 用于创建数据库会话
 # --- 服务和仓库层导入 ---
-from MemeMind_LangChain.app.text_chunk.service import TextChunkService
-from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
+from app.text_chunk.service import TextChunkService
+from app.text_chunk.repository import TextChunkRepository
 # 注意：QueryService 通常不直接依赖 SourceDocumentService/Repository 来处理查询，
 # 除非你需要获取源文档的某些特定信息，但核心检索流程主要依赖 TextChunkService。
 
 # --- Pydantic Schemas ---
-from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
+from app.schemas.schemas import TextChunkResponse
 
 
 async def _embed_query_for_processing(query_text: str) -> list[float]:

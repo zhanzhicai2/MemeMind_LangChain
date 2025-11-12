@@ -8,8 +8,8 @@
 """
 # from sqlalchemy.ext.asyncio import AsyncSession
 #
-# from MemeMind_LangChain.app.source_doc.repository import SourceDocumentRepository
-# from MemeMind_LangChain.app.source_doc.service import SourceDocumentService
+# from app.source_doc.repository import SourceDocumentRepository
+# from app.source_doc.service import SourceDocumentService
 #
 # # 定义依赖项函数，用于为 Celery 任务提供文档服务
 # def get_document_service_for_task(db_session: AsyncSession) -> SourceDocumentService:

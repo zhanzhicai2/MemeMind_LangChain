@@ -6,7 +6,7 @@
 @Date ：2025/11/5 10:08
 @DOC: 创建 ChromaDB 客户端
 """
-from MemeMind_LangChain.app.core.config import settings
+from app.core.config import settings
 from loguru import logger
 import chromadb  # 导入 ChromaDB 客户端库
 

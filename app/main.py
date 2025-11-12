@@ -13,16 +13,19 @@ import gradio as gr
 from fastapi import FastAPI,Response
 from starlette.middleware.cors import CORSMiddleware
 
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.database import initialize_database_for_fastapi, close_database_for_fastapi
-from MemeMind_LangChain.app.core.s3_client import ensure_minio_bucket_exists
-from MemeMind_LangChain.app.utils.migrations import run_migrations
-from MemeMind_LangChain.app.source_doc.routes import router as source_doc_router
-from MemeMind_LangChain.app.query.routes import router as query_router
-from MemeMind_LangChain.app.ui.gradio_interface import rag_demo_ui
+from app.core.config import settings
+from app.core.database import initialize_database_for_fastapi, close_database_for_fastapi
+from app.core.s3_client import ensure_minio_bucket_exists
+from app.utils.migrations import run_migrations
+from app.source_doc.routes import router as source_doc_router
+from app.query.routes import router as query_router
+from app.ui.gradio_interface import rag_demo_ui
 
 from loguru import logger
+from app.core.logging import setup_logging
 
+# 配置日志系统
+setup_logging()
 logger.info("Logging configured completed.")
 run_migrations()
 
@@ -81,8 +84,8 @@ async def health_check(response: Response):
 
 
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# if __name__ == "__main__":
+#     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
 

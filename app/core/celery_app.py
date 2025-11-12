@@ -14,7 +14,7 @@ Celery与RabbitMQ结合使用，提供可靠的异步任务处理能力。
 from celery import Celery
 from kombu import Queue
 
-from MemeMind_LangChain.app.core.config import settings
+from app.core.config import settings
 
 
 # Celery配置
@@ -30,10 +30,7 @@ celery_app = Celery(
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
     include=[
-        "MemeMind_LangChain.app.tasks.document_task"  # 文档处理任务
-        "MemeMind_LangChain.app.query.tasks",           # 查询处理任务
-        "MemeMind_LangChain.app.text_chunk.tasks",      # 文本分块任务
-        "MemeMind_LangChain.app.tasks.mail_task"  # 邮件发送任务
+        "app.tasks.document_task",  # 文档处理任务
     ]
 )
 
@@ -48,18 +45,12 @@ celery_app.conf.update(
     enable_utc=True,                # 启用UTC时间，与应用一致
     # 任务路由配置
     task_routes={
-        "MemeMind_LangChain.app.document_tasks.*": {"queue": "document_task"}, # 文档处理队列
-        "MemeMind_LangChain.app.query.tasks.*": {"queue": "query_processing"}, # 查询处理队列
-        "MemeMind_LangChain.app.text_chunk.tasks.*": {"queue": "text_chunking"}, # 文本分块队列
-        "MemeMind_LangChain.app.tasks.mail_task.*": {"queue": "mail_queue"}  # 邮件发送队列
+        "app.tasks.document_task.*": {"queue": "document_processing"}, # 文档处理队列
     },
 
     # 任务队列定义
     task_queues=(
         Queue("document_processing", routing_key="document_processing"), # 文档处理队列
-        Queue("query_processing", routing_key="query_processing"), # 查询处理队列
-        Queue("text_chunking", routing_key="text_chunking"), # 文本分块队列
-        Queue("reminder_queue", routing_key="reminder_queue"), # 提醒任务队列
     ),
 
     # 任务执行配置

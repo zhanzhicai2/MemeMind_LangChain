@@ -11,12 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from MemeMind_LangChain.app.core.database import get_db
+from app.core.database import get_db
 from loguru import logger
-from MemeMind_LangChain.app.query.service import QueryService
-from MemeMind_LangChain.app.schemas.schemas import TextChunkResponse
-from MemeMind_LangChain.app.text_chunk.repository import TextChunkRepository
-from MemeMind_LangChain.app.text_chunk.service import TextChunkService
+from app.query.service import QueryService
+from app.schemas.schemas import TextChunkResponse
+from app.text_chunk.repository import TextChunkRepository
+from app.text_chunk.service import TextChunkService
 
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
 
