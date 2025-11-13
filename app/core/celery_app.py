@@ -165,3 +165,5 @@ celery_app.conf.update(
 
 
 # uv run celery -A app.core.celery_app worker --loglevel=info --pool=threads -Q celery,document_queue --autoscale=4,2
+# flower 监控
+# uv run flower -A app.core.celery_app --port=5555 http://localhost:5555/ celery -A app_celery.celery_app flower --port=5555 # port指定端口

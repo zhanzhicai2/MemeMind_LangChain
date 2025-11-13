@@ -42,7 +42,7 @@ async def call_ask_api(query_text: str):
     logger.info(f"Gradio 界面正在调用 API: {api_url}，负载: {payload}")
     try:
         # 使用 httpx 异步地发送 POST 请求
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 设置300秒超时
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 设置600秒超时
             response = await client.post(api_url, json=payload)
             response.raise_for_status()  # 如果 API 返回错误状态码 (如 4xx, 5xx)，则会抛出异常
 
@@ -128,7 +128,7 @@ async def upload_doc_bridge(file_obj):
     logger.info(f"Gradio 正在上传文件: {file_obj.name} 到 {api_url}")
     try:
         # 使用 httpx 异步地发送 POST 请求
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 设置300秒超时
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 设置600秒超时
             response = await client.post(api_url, files=files)
             response.raise_for_status()  # 如果 API 返回错误状态码 (如 4xx, 5xx)，则会抛出异常
             data = response.json()
@@ -185,7 +185,7 @@ async def retrieve_chunks_bridge(query: str, top_k: int):
     logger.info(f"Gradio 正在调用检索 API: {api_url}，负载: {payload}")
     try:
         # 使用 httpx 异步地发送 POST 请求
-        async with httpx.AsyncClient(timeout=120.0) as client:  # 设置120秒超时
+        async with httpx.AsyncClient(timeout=600.0) as client:  # 设置600秒超时
             response = await client.post(api_url, json=payload)
             response.raise_for_status()  # 如果 API 返回错误状态码 (如 4xx, 5xx)，则会抛出异常
             chunks_list = response.json()

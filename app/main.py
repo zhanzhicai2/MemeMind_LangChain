@@ -15,7 +15,6 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import initialize_database_for_fastapi, close_database_for_fastapi
-from app.core.s3_client import ensure_minio_bucket_exists
 from app.utils.migrations import run_migrations
 from app.source_doc.routes import router as source_doc_router
 from app.query.routes import router as query_router
@@ -39,7 +38,6 @@ async def lifespan(app: FastAPI):
     # 这样可以防止它们阻塞主线程
     startup_tasks = [
         asyncio.to_thread(initialize_database_for_fastapi),
-        asyncio.to_thread(ensure_minio_bucket_exists, bucket_name=settings.MINIO_BUCKET),
         # asyncio.to_thread(_load_embedding_model),
         # asyncio.to_thread(_load_reranker_model),
         # asyncio.to_thread(_load_llm_model)
