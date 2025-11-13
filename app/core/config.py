@@ -62,7 +62,9 @@ class BaseConfig(BaseSettings):
     RERANKER_INSTRUCTION: str = "给定一个网页搜索查询，检索回答该查询的相关段落" # Rerank 模型指令，用于重新排序检索到的段落
 
     # LLM 相关配置
-    LLM_MODEL_PATH: str = "app/llm_models/Qwen2.5-1.5B-Instruct" # LLM 模型路径
+    # LLM_MODEL_PATH: str = "app/llm_models/Qwen2.5-1.5B-Instruct" # LLM 模型路径
+    LLM_MODEL_PATH: str = "local_models/llm/Qwen2.5-1.5B-Instruct"
+    LLM_SYSTEM_PROMPT: str = "You are a helpful assistant."
 
 
     # Resend 配置
