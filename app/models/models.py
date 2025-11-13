@@ -25,11 +25,19 @@ from typing import Optional, List
 import enum
 
 # 导入SQLAlchemy列类型：ForeignKey外键，Integer整数，String字符串，DateTime日期时间，Boolean布尔值，Text长文本，JSON JSON数据
-from sqlalchemy import ForeignKey, Integer, String, DateTime, Boolean, Text, JSON
-# 导入SQLAlchemy枚举类型，用于数据库中的枚举字段
-from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlalchemy import ForeignKey, Integer, String, DateTime, Boolean, Text, JSON, func
 # 导入SQLAlchemy ORM相关：Mapped类型注解，mapped_column列定义，relationship关系定义，DeclarativeBase声明基类
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
+
+from sqlalchemy import (
+Integer,
+String,
+DateTime,
+Text,
+Enum as SQLAlchemyEnum,
+ForeignKey,
+JSON,
+)
 
 
 # 基类：所有SQLAlchemy模型的声明基类
@@ -43,16 +51,27 @@ class DateTimeMixin:
     # 创建时间字段：记录记录创建时的UTC时间
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),    # 指定时区为UTC的日期时间类型
-        index=True,                 # 创建索引以提高按创建时间查询的性能
-        default=lambda: datetime.now(timezone.utc)  # 默认值为当前UTC时间
+        index=True, # 创建索引以提高按创建时间查询的性能
+        server_default=func.now()  # 默认值为当前UTC时间
     )
     # 更新时间字段：记录记录最后一次更新的UTC时间
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),    # 指定时区为UTC的日期时间类型
         index=True,                 # 创建索引以提高按更新时间查询的性能
-        default=lambda: datetime.now(timezone.utc),  # 默认值为当前UTC时间
-        onupdate=lambda: datetime.now(timezone.utc), # 更新记录时自动设置为当前UTC时间
+        server_default=func.now(),  # 默认值为当前UTC时间
+        onupdate=func.now(),        # 更新记录时自动设置为当前UTC时间
     )
+
+
+# --- StorageType枚举 ---
+class StorageType(enum.Enum):
+    """存储类型枚举"""
+    LOCAL = "local" # 本地存储
+    MINIO = "minio"  # MinIO对象存储
+    CHROMA = "chroma"  # ChromaDB向量存储
+    S3 = "s3"   # Amazon S3对象存储
+
+
 
 # 源文档模型：存储上传到MinIO的文档信息
 class SourceDocument(Base, DateTimeMixin):
@@ -61,6 +80,21 @@ class SourceDocument(Base, DateTimeMixin):
     # 文档ID：主键，自增整数
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
+    # 存储类型：枚举类型，指定文档存储在哪个存储系统中
+    storage_type: Mapped[StorageType] = mapped_column(
+        SQLAlchemyEnum(StorageType),  # 使用SQLAlchemy枚举类型
+        nullable=False,               # 不允许为空
+        default=StorageType.LOCAL,    # 默认值为本地存储
+        index=True                    # 创建索引以提高按存储类型查询的性能
+    )
+
+    # 这是一个通用的文件路径。对于本地存储, 它是服务器上的文件路径; 对于S3/MinIO, 它将是对象的Key。
+    file_path: Mapped[str] = mapped_column(
+        String(512),        # 字符串类型，最大长度512（足够存储复杂的文件路径）
+        nullable=False,     # 不允许为空
+        unique=True,        # 唯一约束，确保文件路径不重复
+        index=True          # 创建索引以提高查询性能
+    )
     # MinIO对象名称：在存储桶中的唯一标识符
     object_name: Mapped[str] = mapped_column(
         String(512),        # 字符串类型，最大长度512（足够存储复杂的对象路径）
@@ -183,12 +217,33 @@ class Message(Base, DateTimeMixin):
     # 消息ID：主键，自增整数
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
+    # 对话ID：标识消息所属的对话会话
+    conversation_id: Mapped[int] = mapped_column(
+        String(50),         # 字符串类型，最大长度50
+        nullable=False,     # 不允许为空（每个消息必须属于一个对话）
+        index=True,         # 创建索引以提高按对话查询消息的性能
+    )
+    # 消息作者：标识消息是用户发送的还是AI生成的
+    author: MessageAuthor = mapped_column(
+        SQLAlchemyEnum(MessageAuthor),
+        nullable=False,
+        default=MessageAuthor.USER
+    )
+    # 消息内容：用户输入或AI回答的文本内容
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
     # 自引用的外键，用于连接回答和问题
     response_to_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("messages.id"),
         nullable=True,      # 允许为空（根消息没有父消息）
         index=True          # 创建索引以提高按父消息查询子消息的性能
     )
+    # 检索到的文本块ID：存储用户查询时检索到的相关文本块ID列表
+    # 这可以用于后续的Rerank操作，以提高回答的准确性
+    retrieved_chunk_ids: Mapped[Optional[List[int]]] = mapped_column(
+        JSON, nullable=True
+    )
+
     # 建立关系，一个'user'消息可以有多个'bot'回答（尽管通常只有一个）
     # 一个'bot'消息只对应一个'user'提问
     user_query: Mapped[Optional["Message"]] = relationship(
@@ -197,13 +252,3 @@ class Message(Base, DateTimeMixin):
     bot_responses: Mapped[List["Message"]] = relationship(
         "Message", back_populates="user_query"
     )
-
-    # 消息作者：标识消息是用户发送的还是AI生成的
-    author: Mapped[MessageAuthor] = mapped_column(
-        SQLAlchemyEnum(MessageAuthor),  # SQL枚举类型，限制只能是USER或BOT
-        nullable=False      # 不允许为空（每条消息必须有作者）
-    )  # 用于区分是用户输入还是AI回答
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    # 存储用于生成答案的上下文信息 (仅对 bot 消息有意义)
-    retrieved_chunk_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
-
