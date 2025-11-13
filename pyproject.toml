@@ -145,6 +145,8 @@ dependencies = [
     "accelerate>=1.11.0",
     "pdfplumber>=0.11.8",
     "pymupdf>=1.26.6",
+    "langchain-chroma>=1.0.0",
+    "langchain-huggingface>=1.0.0",
 ]
 [tool.uv]
 required-environments = [
