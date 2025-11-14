@@ -25,6 +25,11 @@ from app.celery.routes import router as celery_router  # 导入Celery监控路�
 from loguru import logger
 from app.core.logging import setup_logging
 
+from MemeMind_LangChain.app.api import doc_routes, query_routes
+from MemeMind_LangChain.app.chains.embedding_loader import get_qwen_embeddings
+from MemeMind_LangChain.app.chains.llm_loader import get_qwen_llm
+from MemeMind_LangChain.app.chains.reranker_loader import get_qwen_reranker
+
 # 配置日志系统
 setup_logging()
 logger.info("Logging configured completed.")
@@ -38,9 +43,9 @@ async def lifespan(app: FastAPI):
     # 这样可以防止它们阻塞主线程
     startup_tasks = [
         asyncio.to_thread(initialize_database_for_fastapi),
-        # asyncio.to_thread(_load_embedding_model),
-        # asyncio.to_thread(_load_reranker_model),
-        # asyncio.to_thread(_load_llm_model)
+        asyncio.to_thread(get_qwen_embeddings),
+        asyncio.to_thread(get_qwen_reranker),
+        asyncio.to_thread(get_qwen_llm),
     ]
 
     # 使用 asyncio.gather 来【并行】执行所有启动任务
@@ -67,9 +72,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(source_doc_router)
-app.include_router(query_router)
-app.include_router(celery_router)  # 添加Celery监控路由
+app.include_router(doc_routes.router)
+app.include_router(query_routes)
 # 挂载 Gradio 界面
 # vvv 关键的一行：将 Gradio 应用挂载到 FastAPI vvv
 # 这会在您的应用下创建一个 /gradio 路径，用于展示 UI 界面

@@ -119,14 +119,14 @@ def get_qwen_reranker(top_n: int = 5) -> QwenReranker:
     """
     logger.info("开始初始化 Qwen Reranker 组件...")
 
-    # --- 自动设备检测 ---
-    if torch.cuda.is_available():
+    # --- 自动设备检测并要求内存大于10G ---
+    if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 10 * 1024 * 1024 * 1024:
         device = torch.device("cuda")
-        logger.info("检测到 CUDA，Reranker 将使用 GPU。")
+        logger.info("检测到 CUDA，Reranker 将使用 GPU, 内存大于10G。")
         model_kwargs = {"torch_dtype": torch.float16, "attn_implementation": "flash_attention_2"}
-    elif torch.backends.mps.is_available():
+    elif torch.backends.mps.is_available() and torch.mps.get_device_properties(0).total_memory > 10 * 1024 * 1024 * 1024:
         device = torch.device("mps")
-        logger.info("检测到 MPS (Apple Silicon)，Reranker 将使用 MPS。")
+        logger.info("检测到 MPS (Apple Silicon)，Reranker 将使用 MPS, 内存大于10G。")
         model_kwargs = {"torch_dtype": torch.float16}
     else:
         device = torch.device("cpu")

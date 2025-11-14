@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 import aiofiles
-from fastapi import UploadFile, HTTPException
+from fastapi import HTTPException
 from loguru import logger
 from fastapi.responses import FileResponse
 
@@ -29,12 +29,14 @@ class SourceDocumentService:
     def __init__(self, repository: SourceDocumentRepository):
         self.repository = repository
 
-    async def add_document(self, file: UploadFile)->SourceDocumentResponse:
+    async def add_document(
+            self, file_content: bytes,filename: str, content_type: str
+    )->SourceDocumentResponse:
         """处理文档上传，将其保存到本地文件系统，并在数据库中创建记录。"""
 
         # ===== 1. 文件元数据处理 =====
-        original_filename = file.filename or f"unnamed_{uuid.uuid4()}" # 确保文件名非空
-        client_provided_content_type = file.content_type # 确保内容类型非空
+        original_filename = filename or f"unnamed_{uuid.uuid4()}" # 确保文件名非空
+        client_provided_content_type = content_type or "application/octet-stream" # 确保内容类型非空
         guessed_type, _ = mimetypes.guess_type(original_filename) # 尝试根据文件名猜测内容类型
         final_content_type = (
                 guessed_type or client_provided_content_type or "application/octet-stream" # 确保最终内容类型非空
@@ -45,9 +47,7 @@ class SourceDocumentService:
             f"最终类型: {final_content_type}"
         )
 
-        file_content = await file.read() # 读取文件内容
         size = len(file_content)  # 文件大小
-        await file.close() # 确保文件关闭
 
         # ===== 2. 文件保存 =====
         # 构建本地文件路径
