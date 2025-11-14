@@ -8,9 +8,9 @@
 """
 import asyncio
 
-from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from loguru import logger
 from langchain_core.documents import Document
 from MemeMind_LangChain.app.chains.vector_store import get_chroma_vector_store
@@ -23,60 +23,40 @@ from MemeMind_LangChain.app.repository.chunk_repository import TextChunkReposito
 from MemeMind_LangChain.app.services.chunk_service import TextChunkService
 
 
-
-def standardize_metadata(
-    doc: Document, original_filename: str, file_path: str
-) -> Document:
-    """统一设置文档元数据，确保一致性"""
-    if "metadata" not in doc:
-        doc.metadata = {}
-    doc.metadata.update({"original_filename": original_filename, "source": file_path})
-    return doc
-
-async def load_documents(
-        file_path: str, original_filename: str, task_id_for_log: str
-) -> list[Document]:
-    """异步加载文档并设置初始元数据"""
-    logger.info(f"{task_id_for_log} [Load] 正在使用 UnstructuredLoader 加载文档...")
-    loader = UnstructuredFileLoader(file_path)
+async def _load_docs(input_dict: dict) -> list[Document]:
+    doc_record = input_dict["doc_record"]
+    task_id = input_dict["task_id"]
+    logger.info(f"{task_id} [1/5 Load] 使用 UnstructuredLoader 加载文档: {doc_record.file_path}")
+    loader = UnstructuredFileLoader(doc_record.file_path)
     loaded_docs = await asyncio.to_thread(loader.load)
     for doc in loaded_docs:
-        standardize_metadata(doc, original_filename, file_path)
+        doc.metadata = {"original_filename": doc_record.original_filename, "source": doc_record.file_path}
     return loaded_docs
-async def split_documents(
-        loaded_docs: list[Document], task_id_for_log: str
-) -> list[Document]:
-    """分割文档并清理元数据"""
-    logger.info(f"{task_id_for_log} [Split] 正在使用 RecursiveCharacterTextSplitter 分割文档...")
+
+def _split_docs(documents: list[Document]) -> list[Document]:
+    # 分割文档
+    logger.info(f"[2/5 Split] 使用 RecursiveCharacterTextSplitter 分割 {len(documents)} 个文档...")
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.CHUNK_SIZE,
         chunk_overlap=settings.CHUNK_OVERLAP,
         length_function=len,
         is_separator_regex=False,
+        add_start_index=True,
     )
-    split_docs = text_splitter.split_documents(loaded_docs)
-    logger.info(f"{task_id_for_log} [Filter] 正在清理文档元数据...")
-    original_metadata = [doc.metadata.copy() for doc in split_docs]
-    split_docs = filter_complex_metadata(split_docs)
-    for i, doc in enumerate(split_docs):
-        removed_keys = set(original_metadata[i].keys()) - set(doc.metadata.keys())
-        if removed_keys:
-            logger.debug(f"{task_id_for_log} [Filter] 移除的元数据字段: {removed_keys}")
-        # 重新设置元数据，确保一致性
-        standardize_metadata(
-            doc,
-            original_metadata[i]["original_filename"],
-            original_metadata[i]["source"],
-        )
-    return split_docs
-async def store_to_sql(
-        split_docs: list[Document],
-        document_id: int,
-        text_chunk_service: TextChunkService,
-        task_id_for_log: str,
-) -> list:
-    """将文本块存储到 PostgreSQL"""
-    logger.info(f"{task_id_for_log} [Store to SQL] 正在将文本块存入 PostgreSQL...")
+    chunks = text_splitter.split_documents(documents)
+    logger.info(f"[2/5 Split] 分割完成，共生成 {len(chunks)} 个文本块。")
+    return chunks
+
+
+async def _store_chunks_to_sql(input_dict: dict) -> list:
+    chunks = input_dict["chunks"]
+    document_id = input_dict["doc_record"].id
+    text_chunk_service = input_dict["text_chunk_service"]
+    task_id = input_dict["task_id"]
+
+    logger.info(f"{task_id} [3/5 SQL Store] 准备将 {len(chunks)} 个文本块存入 PostgreSQL...")
+    if not chunks:
+        return []
     chunks_to_create = [
         TextChunkCreate(
             source_document_id=document_id,
@@ -84,102 +64,101 @@ async def store_to_sql(
             sequence_in_document=i,
             metadata_json=doc.metadata,
         )
-        for i, doc in enumerate(split_docs)
+        for i, doc in enumerate(chunks)
     ]
-    created_chunk_orm_objects = await text_chunk_service.add_chunks_in_bulk(
-        chunks_data=chunks_to_create
-    )
-    logger.success(
-        f"{task_id_for_log} [Store to SQL] {len(created_chunk_orm_objects)} 个文本块已存入 PostgreSQL。"
-    )
-    return created_chunk_orm_objects
+    created_pydantic_chunks = await text_chunk_service.add_chunks_in_bulk(chunks_data=chunks_to_create)
+    logger.success(f"{task_id} [3/5 SQL Store] {len(created_pydantic_chunks)} 个文本块已存入 PostgreSQL。")
+    return created_pydantic_chunks
 
-async def store_to_vector_db(
-        split_docs: list[Document], created_chunk_orm_objects: list, task_id_for_log: str
-) -> None:
-    """将文本块嵌入并存储到 ChromaDB"""
-    logger.info(f"{task_id_for_log} [Store to Vector DB] 正在将文本块嵌入并存储到 ChromaDB...")
-    vector_store = get_chroma_vector_store()
+async def _add_to_vector_store(input_dict: dict) -> int:
+    split_docs = input_dict["chunks"]
+    sql_chunks = input_dict["sql_chunks"]
+    task_id = input_dict["task_id"]
+
+    if not split_docs or not sql_chunks:
+        logger.warning(f"{task_id} [4/5 Vector Store] 没有文本块需要存入向量库。")
+        return 0
+
+    logger.info(f"{task_id} [4/5 Vector Store] 准备将 {len(split_docs)} 个文本块嵌入并存入 ChromaDB...")
+    ids_for_vector_db = [str(chunk.id) for chunk in sql_chunks]
     for i, doc in enumerate(split_docs):
-        doc.metadata["text_chunk_pg_id"] = created_chunk_orm_objects[i].id
+        doc.metadata["text_chunk_pg_id"] = sql_chunks[i].id
+    vector_store = get_chroma_vector_store()
+    await vector_store.aadd_documents(documents=split_docs, ids=ids_for_vector_db)
 
-    await asyncio.to_thread(
-        vector_store.add_documents,
-        documents=split_docs,
-        ids=[str(chunk.id) for chunk in created_chunk_orm_objects],
-    )
-    logger.success(
-        f"{task_id_for_log} [Store to Vector DB] {len(split_docs)} 个文本块已嵌入并存储到 ChromaDB。"
-    )
+    logger.success(f"{task_id} [4/5 Vector Store] {len(split_docs)} 个文本块已成功嵌入并存入 ChromaDB。")
+    return len(split_docs)
 
 async def run_ingestion_pipeline(document_id: int, task_id_for_log: str)->dict[str, any]:
     """
-    一个完整的、基于 LangChain 的文档注入流水线。
+    一个完整的、基于LCEL的文档注入流水线。
     它取代了旧的 _execute_document_processing_async 函数。
     流程: Load -> Split -> Store (SQL) -> Embed & Store (Vector)
     """
     task_logger = logger.bind(task_id=task_id_for_log)
-    task_logger.info(f"{task_id_for_log} 开始执行 LangChain 文档注入流水线...")
+    task_logger.info(f"{task_id_for_log} 开始执行 LCEL 文档注入流水线...")
 
     # 为 Celery 任务创建独立的数据库连接
     db_engine, SessionLocal = create_engine_and_session_for_celery()
+    # 将 source_doc_service 的创建提到 try 外部，以便 finally 块也能使用
+    # 在Celery任务的上下文中，为每次任务调用创建一个新的会话和service实例是安全的
+    async with SessionLocal() as db:
+        doc_repo = SourceDocumentRepository(db)
+        # 我们将复用这个 service 实例
+        source_doc_service = SourceDocumentService(doc_repository=doc_repo)
+
     try:
         async with (SessionLocal() as db):
-            # --- 0. 准备工作：初始化服务并更新状态 ---
-            source_doc_repo = SourceDocumentRepository(db)
-            source_doc_service = SourceDocumentService(source_doc_repo)
-            text_chunk_repo = TextChunkRepository(db)
-            text_chunk_service = TextChunkService(text_chunk_repo)
-            await source_doc_service.update_document_processing_info(document_id, status="processing")
-            doc_record = await source_doc_repo.get_by_id(document_id)
-            task_logger.info(f"{task_id_for_log} 状态更新为 'processing'，文件路径: '{doc_record.file_path}'")
-
-            # 1. 加载文档
-            loaded_docs = await load_documents(
-                doc_record.file_path, doc_record.original_filename, task_id_for_log
+            # 重新获取与当前会话绑定的服务和仓库
+            doc_repo = SourceDocumentRepository(db)
+            source_doc_service_in_try = SourceDocumentService(doc_repository=doc_repo)
+            chunk_repo = TextChunkRepository(db)
+            text_chunk_service = TextChunkService(chunk_repo)
+            # --- 1. 准备工作：使用 service 层更新状态 ---
+            await source_doc_service_in_try.update_document_processing_info(
+                document_id, status="processing"
             )
-            # 2. 分割文档
-            split_docs = await split_documents(loaded_docs, task_id_for_log)
-            number_of_chunks = len(split_docs)
-            if number_of_chunks == 0:
-                task_logger.warning(f"{task_id_for_log} 文档解析后未产生任何文本块，任务终止。")
-                await source_doc_service.update_document_processing_info(
-                    document_id, status="error", error_message="解析后文本内容为空"
+            doc_record = await doc_repo.get_by_id(document_id)
+            task_logger.info(f"状态更新为 'processing', 文件路径: '{doc_record.file_path}'")
+            # --- 2. 定义LCEL流水线 ---
+            ingestion_chain = (
+                    RunnablePassthrough.assign(chunks=RunnableLambda(_load_docs)
+                                                      | RunnableLambda(_split_docs))
+                    | RunnablePassthrough.assign(sql_chunks=RunnableLambda(_store_chunks_to_sql))
+                    | RunnableLambda(_add_to_vector_store)
+            )
+            # --- 3. 执行流水线 ---
+            initial_input = {
+                "doc_record": doc_record,
+                "text_chunk_service": text_chunk_service,
+                "task_id": task_id_for_log
+            }
+            number_of_chunks = await ingestion_chain.ainvoke(initial_input)
+
+            # --- 4. 收尾工作：使用 service 层更新最终状态 ---
+            if number_of_chunks > 0:
+                await source_doc_service_in_try.update_document_processing_info(
+                    document_id,
+                    status="ready",
+                    number_of_chunks=number_of_chunks,
+                    set_processed_now=True,  # service层会自动处理时间
+                    error_message=None
                 )
+                task_logger.success("[5/5 Finish] Pipeline 处理成功，文档状态更新为 'ready'。")
+                return {"status": "success", "chunks_created": number_of_chunks}
+            else:
+                await source_doc_service_in_try.update_document_processing_info(
+                    document_id, status="error", error_message="文档解析后未产生任何文本块"
+                )
+                task_logger.warning("[5/5 Finish] 文档解析后未产生任何文本块，任务终止。")
                 return {"status": "warning", "message": "No content to process."}
-            task_logger.success(f"{task_id_for_log} [Split] 分割完成，共产生 {number_of_chunks} 个文本块。")
-            task_logger.info(f"{task_id_for_log} [Store SQL] 正在将 {number_of_chunks} 个文本块构建干净的元数据...")
 
-            # --- 3. Store to SQL (存入关系型数据库) ---
-            # 3. 存储到 SQL
-            created_chunk_orm_objects = await store_to_sql(
-                split_docs, document_id, text_chunk_service, task_id_for_log
-            )
-
-            # 4. 嵌入并存储到向量数据库
-            await store_to_vector_db(
-                split_docs, created_chunk_orm_objects, task_id_for_log
-            )
-
-            # --- 5. 结束阶段：更新最终状态 ---
-            await source_doc_service.update_document_processing_info(
-                document_id,
-                status="ready",
-                number_of_chunks=number_of_chunks,
-                set_processed_now=True,
-                error_message=None
-            )
-            task_logger.success(f"{task_id_for_log} 流水线处理成功，文档状态更新为 'ready'。")
-            return {"status": "success", "chunks_created": number_of_chunks}
     except Exception as e:
         task_logger.error(f"{task_id_for_log} 流水线处理失败: {e}", exc_info=True)
-        # 异常处理：更新数据库状态为 "error"
-        async with SessionLocal() as error_db:
-            error_repo = SourceDocumentRepository(error_db)
-            error_service = SourceDocumentService(error_repo)
-            await error_service.update_document_processing_info(
-                document_id, status="error", error_message=str(e)[:500]
-            )
+        # 在异常处理中，也使用 service 层来更新状态
+        await source_doc_service.update_document_processing_info(
+            document_id, status="error", error_message=str(e)[:500]
+        )
         raise e  # 重新抛出异常，让Celery知道任务失败
     finally:
         await db_engine.dispose()

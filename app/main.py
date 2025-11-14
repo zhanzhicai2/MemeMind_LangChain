@@ -26,9 +26,9 @@ from loguru import logger
 from app.core.logging import setup_logging
 
 from MemeMind_LangChain.app.api import doc_routes, query_routes
-from MemeMind_LangChain.app.chains.embedding_loader import get_qwen_embeddings
+from MemeMind_LangChain.app.chains.embedding_loader import get_bge_embeddings
 from MemeMind_LangChain.app.chains.llm_loader import get_qwen_llm
-from MemeMind_LangChain.app.chains.reranker_loader import _get_reranker_model_and_tokenizer
+from MemeMind_LangChain.app.chains.reranker_loader import get_bge_reranker
 
 # 配置日志系统
 setup_logging()
@@ -43,8 +43,8 @@ async def lifespan(app: FastAPI):
     # 这样可以防止它们阻塞主线程
     startup_tasks = [
         asyncio.to_thread(initialize_database_for_fastapi),
-        asyncio.to_thread(get_qwen_embeddings),
-        asyncio.to_thread(_get_reranker_model_and_tokenizer),
+        asyncio.to_thread(get_bge_embeddings),
+        asyncio.to_thread(get_bge_reranker),
         asyncio.to_thread(get_qwen_llm),
     ]
 
