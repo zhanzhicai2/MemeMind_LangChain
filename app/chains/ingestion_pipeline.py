@@ -8,10 +8,13 @@
 """
 import asyncio
 
+from langchain_community.vectorstores.utils import filter_complex_metadata
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.document_loaders import UnstructuredFileLoader
 from loguru import logger
 
+from MemeMind_LangChain.app.chains.vector_store import get_chroma_vector_store
 from MemeMind_LangChain.app.core.config import settings
 from MemeMind_LangChain.app.core.database import create_engine_and_session_for_celery
 from MemeMind_LangChain.app.repository.doc_repository import SourceDocumentRepository
@@ -48,6 +51,10 @@ async def run_ingestion_pipeline(document_id: int, task_id_for_log: str):
             loader = UnstructuredFileLoader(doc_record.file_path)
             loaded_docs = await asyncio.to_thread(loader.load)
             # --- 2. Split (分割) ---
+            for doc in loaded_docs:
+                # 确保每个从文件中加载出来的 Document 对象都知道它的原始文件名
+                doc.metadata["original_filename"] = doc_record.original_filename
+            # split
             logger.info(f"{task_id_for_log} [Split] 正在使用 RecursiveCharacterTextSplitter 分割文档...")
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=settings.CHUNK_SIZE,
@@ -55,6 +62,14 @@ async def run_ingestion_pipeline(document_id: int, task_id_for_log: str):
                 length_function=len,
             )
             split_docs = text_splitter.split_documents(loaded_docs)
+            logger.info(f"{task_id_for_log} [Filter] 正在清理文档元数据...")
+            split_docs = filter_complex_metadata(split_docs)
+            for doc in split_docs:
+                if "metadata" not in doc:
+                    doc["metadata"] = {}
+                doc.metadata["original_filename"] = doc_record.original_filename
+                # 保留 source 字段，它指向内部存储路径，也很有用
+                doc.metadata["source"] = doc_record.file_path
             number_of_chunks = len(split_docs)
             if number_of_chunks == 0:
                 logger.warning(f"{task_id_for_log} 文档解析后未产生任何文本块，任务终止。")
@@ -63,6 +78,24 @@ async def run_ingestion_pipeline(document_id: int, task_id_for_log: str):
                 )
                 return {"status": "warning", "message": "No content to process."}
             logger.success(f"{task_id_for_log} [Split] 分割完成，共产生 {number_of_chunks} 个文本块。")
+            logger.info(f"{task_id_for_log} [Store SQL] 正在将 {number_of_chunks} 个文本块构建干净的元数据...")
+            final_docs_for_storage = []
+            for i, doc in enumerate(split_docs):
+                # 为每个块创建一个干净、可控的元数据字典
+                final_metadata = {
+                    "source": doc_record.file_path,
+                    "original_filename": doc_record.original_filename,  # 明确注入原始文件名
+                    "sequence": i,
+                }
+                # 从 unstructured 的结果中安全地提取页码（如果存在）
+                if "page" in doc.metadata:
+                    final_metadata["page"] = doc.metadata["page"]
+                new_doc = Document(
+                    page_content=doc.page_content,
+                    metadata=final_metadata,
+                )
+                final_docs_for_storage.append(new_doc)
+
             # --- 3. Store to SQL (存入关系型数据库) ---
             logger.info(f"{task_id_for_log} [Store SQL] 正在将文本块存入 PostgreSQL...")
             chunks_to_create = [
@@ -73,8 +106,9 @@ async def run_ingestion_pipeline(document_id: int, task_id_for_log: str):
                     metadata_json=doc.metadata,  # unstructured 的元数据可以直接存入
                 ) for i, doc in enumerate(split_docs)
             ]
-            # 我们需要批量创建后返回的 ORM 对象，以获取它们的ID
-            created_chunk_orm_objects = await text_chunk_service.add_chunks_in_bulk(chunks_data=chunks_to_create)
+            created_chunk_orm_objects = (
+                await text_chunk_service.add_chunks_in_bulk(chunks_data=chunks_to_create)
+            )
             logger.success(f"{task_id_for_log} [Store SQL] {len(created_chunk_orm_objects)} 个文本块已存入 PostgreSQL。")
             # --- 4. Embed & Store to Vector DB (嵌入并存入向量数据库) ---
             # 这是最核心的 LangChain 魔法
@@ -95,8 +129,11 @@ async def run_ingestion_pipeline(document_id: int, task_id_for_log: str):
 
             # --- 5. 结束阶段：更新最终状态 ---
             await source_doc_service.update_document_processing_info(
-                document_id, status="ready", number_of_chunks=number_of_chunks,
-                set_processed_now=True, error_message=None
+                document_id,
+                status="ready",
+                number_of_chunks=number_of_chunks,
+                set_processed_now=True,
+                error_message=None
             )
             logger.success(f"{task_id_for_log} 流水线处理成功，文档状态更新为 'ready'。")
             return {"status": "success", "chunks_created": number_of_chunks}

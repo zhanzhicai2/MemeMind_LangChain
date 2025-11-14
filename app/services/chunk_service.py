@@ -4,10 +4,10 @@
 @IDE ：PyCharm
 @Author ：zhanzhicai
 @Date ：2025/11/4 18:12
-@DOC: 
+@DOC: 文本块服务层
 """
-from app.text_chunk.repository import TextChunkRepository
-from app.schemas.schemas import TextChunkCreate, TextChunkResponse
+from MemeMind_LangChain.app.repository.chunk_repository import TextChunkRepository
+from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate, TextChunkResponse
 from loguru import logger
 
 
@@ -22,7 +22,7 @@ class TextChunkService:
         new_chunk = await self.repository.create(data)
         return TextChunkResponse.model_validate(new_chunk)
 
-    async def add_chunks_for_document(
+    async def add_chunks_in_bulk(
         self, chunks_data: list[TextChunkCreate]
     ) -> list[TextChunkResponse]:
         new_chunks = await self.repository.create_bulk(chunks_data)

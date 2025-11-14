@@ -40,7 +40,12 @@ async def upload_document_router(
     """
     logger.info(f"接收到文件上传请求: {file.filename}")
     try:
-        created_document = await service.add_document(file=file) # 创建文档记录
+        file_content = await file.read() # 异步读取文件内容
+        created_document = await service.add_document(
+            file_content=file_content,
+            filename=file.filename,
+            content_type=file.content_type,
+        ) # 创建文档记录
         logger.info(f"文件 {file.filename} 上传成功, 文档 ID: {created_document.id}")
         return created_document  # 返回创建的文档记录
     except Exception as e:

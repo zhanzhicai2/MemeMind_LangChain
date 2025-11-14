@@ -45,7 +45,9 @@ class BaseConfig(BaseSettings):
     LOCAL_STORAGE_PATH: str = "source_documents/"
 
     # ChromaDB 配置
-    CHROMA_HTTP_ENDPOINT: str = "http://localhost:5500"  # ChromaDB HTTP 访问地址
+    CHROMA_HOST: str = "localhost"
+    CHROMA_PORT: int = 5500
+    # CHROMA_HTTP_ENDPOINT: str = "http://localhost:5500"  # ChromaDB HTTP 访问地址
     CHROMA_COLLECTION_NAME: str = "mememind_rag_collection"  # ChromaDB 集合名称
 
     # Embedding 模型相关

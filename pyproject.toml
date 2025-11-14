@@ -135,7 +135,7 @@ dependencies = [
     "typing-extensions==4.15.0",
     "typing-inspection==0.4.1",
     "tzlocal==5.3.1",
-    "unstructured[docx,md,pdf,pdfminer,pptx,xlsx]>=0.18.18",
+    "unstructured[docx,local-inference,md,pdf,pdfminer,pptx,xlsx]>=0.18.18",
     "urllib3==2.5.0",
     "uv==0.8.22",
     "uvicorn==0.37.0",
@@ -147,6 +147,9 @@ dependencies = [
     "pymupdf>=1.26.6",
     "langchain-chroma>=1.0.0",
     "langchain-huggingface>=1.0.0",
+    "langchain-community>=0.4.1",
+    "sentence-transformers>=5.1.2",
+    "unstructured-client>=0.42.3",
 ]
 [tool.uv]
 required-environments = [

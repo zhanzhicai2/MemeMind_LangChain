@@ -9,7 +9,7 @@
 from functools import lru_cache
 import  torch
 from loguru import logger
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from app.core.config import settings
 
 """ 下载新模型命令
@@ -24,16 +24,7 @@ class QwenInstructionalEmbeddings(HuggingFaceEmbeddings):
     一个自定义的嵌入类，继承自 HuggingFaceEmbeddings。
     它专门用于处理像 Qwen 这样需要在查询（Query）前添加特定指令（Instruction）的模型。
     """
-    def __init__(self, query_instruction: str  ,**kwargs):
-        """
-        初始化 QwenInstructionalEmbeddings 类。在初始化时，接收一个用于查询的指令字符串。
-        :param model_name:  HuggingFace 模型名称，默认值为 settings.EMBEDDING_MODEL_PATH。
-        :param query_instruction: Qwen 模型的查询指令，用于在查询前添加特定前缀。
-        :param kwargs: 其他 HuggingFaceEmbeddings 类的初始化参数。
-        """
-        super().__init__(**kwargs)
-        self.query_instruction = query_instruction
-        logger.info(f"自定义查询指令已设置: '{self.query_instruction}'")
+    query_instruction: str # Qwen 模型的查询指令，用于在查询前添加特定前缀。
 
     def embed_query(self, text: str, **kwargs) -> list[float]:
         """
@@ -63,14 +54,14 @@ def get_qwen_embeddings() -> QwenInstructionalEmbeddings:
     logger.info("开始初始化 Qwen 嵌入模型组件...")
     # --- 自动设备检测 并且 内存检查 内存足够才选择GPU或者MPS ---
     if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory >= 10 * 1024 * 1024 * 1024:
-        device = 'cuda'
+        device = "cuda"
         logger.info("检测到 CUDA，将使用 GPU。")
     # 检查MPS是否可用，并且MPS内存足够
     elif torch.backends.mps.is_available() and torch.mps.get_device_properties(0).total_memory >= 10 * 1024 * 1024 * 1024:
-        device = 'mps'
+        device = "mps"
         logger.info("检测到 MPS (Apple Silicon)，将使用 MPS。")
     else:
-        device = 'cpu'
+        device = "cpu"
         logger.info("未检测到 CUDA 或 MPS，将使用 CPU。")
     try:
         # 使用我们自定义的类来实例化
@@ -79,9 +70,9 @@ def get_qwen_embeddings() -> QwenInstructionalEmbeddings:
             query_instruction=settings.EMBEDDING_INSTRUCTION_FOR_RETRIEVAL,
             # b. 传入 HuggingFaceEmbeddings 的标准参数
             model_name=settings.EMBEDDING_MODEL_PATH,
-            model_kwargs={'device': device},
+            model_kwargs={"device": device},
             encode_kwargs={
-                'normalize_embeddings': True,  # 推荐进行归一化
+                "normalize_embeddings": True,  # 推荐进行归一化
             }
         )
         logger.success(f"Qwen 嵌入模型组件初始化成功，运行于设备: '{device}'")

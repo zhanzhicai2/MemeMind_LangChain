@@ -6,12 +6,12 @@
 @Date ：2025/11/14 02:20
 @DOC: 
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
-from MemeMind_LangChain.app.chains.qa_chain import get_qwen_contextual_retriever
+from MemeMind_LangChain.app.chains.qa_chain import get_standalone_retriever
 from MemeMind_LangChain.app.services.query_service import QueryService
 
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
@@ -29,6 +29,7 @@ class AskRequest(BaseModel):
 
 class RetrieveRequest(BaseModel):
     query: str
+    top_k: int = Field(5, gt=0, le=100, description="要返回的精排后文本块数量")
 
 # --- API 端点 ---
 @router.post("/ask/stream")
@@ -64,12 +65,14 @@ async def stream_ask_llm_question(
 async def retrieve_chunks_for_query(request: RetrieveRequest):
     """
     用于调试的端点，仅执行检索和精排，返回最终的上下文文档。
+    支持自定义 top_k
     """
-    logger.info(f"执行调试检索，查询: '{request.query}'")
+    logger.info(f"执行调试检索，查询: '{request.query}', top_k: {request.top_k}")
     try:
-        retriever = get_qwen_contextual_retriever()
-        # 直接调用检索器
-        retrieved_docs = await retriever.ainvoke(request.query)
+        #  直接调用我们更新后的独立检索函数，并传入 top_k
+        retrieved_docs = await get_standalone_retriever(
+            query=request.query,
+            top_k=request.top_k)
         return retrieved_docs
     except Exception as e:
         logger.error(f"调试检索时出错: {e}", exc_info=True)
