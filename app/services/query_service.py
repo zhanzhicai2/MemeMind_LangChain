@@ -17,8 +17,17 @@ class QueryService():
     """
     def __init__(self):
         # 在服务实例化时，直接创建并持有 RAG 链
-        self.rag_chain = create_rag_qa_chain()
+        self.rag_chain = None
         logger.info("QueryService 已初始化，并成功创建 RAG 链。")
+
+    @classmethod
+    async def create(cls):
+        """异步创建 QueryService 实例"""
+        logger.info("开始创建 QueryService 实例")
+        instance = cls()
+        instance.rag_chain = await create_rag_qa_chain()  # 异步调用
+        logger.info("QueryService 已异步加载 RAG 链。")
+        return instance
 
     async def stream_answer(self, query: str):
         """
@@ -27,6 +36,11 @@ class QueryService():
         :return: 异步生成器，每次返回 RAG 链的一个回答块
         """
         logger.info(f"收到查询: {query}")
+        # 检查 RAG 链是否已加载
+        if self.rag_chain is None:
+            logger.error("RAG 链未加载，无法处理查询。")
+            raise RuntimeError("RAG 链未初始化，请使用 QueryService.create() 创建实例")
+
         # 调用 RAG 链的异步流式方法
         async for chunk in self.rag_chain.astream(query):
             yield chunk

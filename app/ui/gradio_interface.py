@@ -7,7 +7,6 @@
 @DOC: Gradio 界面服务层
 """
 
-
 import os
 import time
 import httpx
@@ -61,12 +60,18 @@ async def get_all_docs_gradio():
             return pd.DataFrame(columns=["ID", "文件名", "状态", "块数量", "上传时间"])
 
         df = pd.DataFrame(docs_list)
-        df_display = df[["id", "original_filename", "status", "number_of_chunks", "created_at"]].copy()
+        df_display = df[
+            ["id", "original_filename", "status", "number_of_chunks", "created_at"]].copy()
         df_display['created_at'] = pd.to_datetime(df_display['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        df_display.rename(columns={
-            "id": "ID", "original_filename": "文件名", "status": "处理状态",
-            "number_of_chunks": "块数量", "created_at": "上传时间"
-        }, inplace=True)
+        df_display.rename(
+            columns={
+                "id": "ID",
+                "original_filename": "文件名",
+                "status": "处理状态",
+                "number_of_chunks": "块数量",
+                "created_at": "上传时间"
+            },
+            inplace=True)
         return df_display
     except Exception as e:
         gr.Error(f"无法加载文档列表: {e}")
@@ -81,7 +86,11 @@ async def upload_doc_gradio(file_obj: gr.File):
     api_url = f"{FASTAPI_BASE_URL}/documents"
     original_filename = getattr(file_obj, 'orig_name', os.path.basename(file_obj.name))
 
-    files = {'file': (original_filename, open(file_obj.name, 'rb'), 'application/octet-stream')}
+    files = {
+        'file': (
+            original_filename,
+            open(file_obj.name, 'rb'),
+            'application/octet-stream')}
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:

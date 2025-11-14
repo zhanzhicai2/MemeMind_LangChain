@@ -28,8 +28,8 @@ from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceD
 
 
 class SourceDocumentService:
-    def __init__(self, repository: SourceDocumentRepository,chunk_service: TextChunkService):
-        self.repository = repository
+    def __init__(self, doc_repository: SourceDocumentRepository,chunk_service: TextChunkService):
+        self.repository = doc_repository
         self.chunk_service = chunk_service
 
     async def add_document(

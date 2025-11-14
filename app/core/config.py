@@ -52,7 +52,9 @@ class BaseConfig(BaseSettings):
 
     # Embedding 模型相关
     EMBEDDING_MODEL_PATH: str = "local_models/embedding/Qwen3-Embedding-0.6B"
-    EMBEDDING_INSTRUCTION_FOR_RETRIEVAL: str = "为这个句子生成表示以用于检索相关文章" # 为这个句子生成表示以用于检索相关文章，嵌入模型指令，用于检索相关文章
+    EMBEDDING_INSTRUCTION_FOR_RETRIEVAL: str = (
+        "生成表示以检索与查询的核心主题或概念高度相关的知识库文档"
+    )# 为这个句子生成表示以用于检索相关文章，嵌入模型指令，用于检索相关文章
     EMBEDDING_DIMENSIONS: int = 1024  # 嵌入维度, Qwen 0.6B为1024 Qwen 4B为2560
     CHUNK_SIZE: int = 1024 # 文本分块大小，用于处理长文本 (增大以减少总块数)
     CHUNK_OVERLAP: int = 100 # 文本分块重叠大小，用于保持上下文连贯性 (相应增加重叠)
@@ -62,14 +64,19 @@ class BaseConfig(BaseSettings):
     INITIAL_RETRIEVAL_TOP_K: int = 30  # 第一阶段向量召回的数量
     INITIAL_RETRIEVAL_TOP_N: int = 5  # Rerank 后最终选取的数量
     # FINAL_CONTEXT_TOP_N: int = 5  # Rerank 后最终选取的数量
-    RERANKER_INSTRUCTION: str = "给定一个网页搜索查询，检索回答该查询的相关段落" # Rerank 模型指令，用于重新排序检索到的段落
+    RERANKER_INSTRUCTION: str = (
+        "Evaluate whether the document directly addresses the query's core topic, concept, or knowledge management theme. "
+        "Return 'yes' if the document provides clear, relevant information about knowledge bases, themes, or concepts, "
+        "and 'no' if it is unrelated or only tangentially relevant."
+    )  # Rerank 模型指令，用于重新排序检索到的段落
 
     # LLM 相关配置
     # LLM_MODEL_PATH: str = "app/llm_models/Qwen2.5-1.5B-Instruct" # LLM 模型路径
     LLM_MODEL_PATH: str = "local_models/llm/Qwen2.5-1.5B-Instruct"
-    LLM_SYSTEM_PROMPT: str = "You are a helpful assistant."
-
-
+    LLM_SYSTEM_PROMPT: str = (
+        "You are a knowledgeable assistant specialized in knowledge management and personal knowledge bases. "
+        "Provide clear, structured, and accurate answers based on the given context, focusing on themes, concepts, and reliable information."
+    )
     # Resend 配置
     # RESEND_API_KEY: str
 

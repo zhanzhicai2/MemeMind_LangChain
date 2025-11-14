@@ -150,8 +150,11 @@ dependencies = [
     "langchain-community>=0.4.1",
     "sentence-transformers>=5.1.2",
     "unstructured-client>=0.42.3",
+    "libmagic>=1.0",
 ]
 [tool.uv]
 required-environments = [
     "sys_platform == 'darwin' and platform_machine == 'x86_64'"
 ]
+[project]
+requires-python = ">=3.8,<3.13"

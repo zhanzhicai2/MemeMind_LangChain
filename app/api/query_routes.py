@@ -17,11 +17,19 @@ from MemeMind_LangChain.app.services.query_service import QueryService
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
 
 # 依赖注入 QueryService
-def get_query_service()->QueryService:
-    """
-    依赖注入 QueryService 实例。
-    """
-    return QueryService()
+# def get_query_service()->QueryService:
+#     """
+#     依赖注入 QueryService 实例。
+#     """
+#     return QueryService()
+
+async def get_query_service() -> QueryService:
+    """异步创建并缓存 QueryService 实例"""
+    logger.info("创建 QueryService 实例")
+    query_service = await QueryService.create()
+    return query_service
+
+
 
 # --- 新的、简化的请求和响应模型 ---
 class AskRequest(BaseModel):
