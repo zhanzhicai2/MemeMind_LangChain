@@ -14,6 +14,8 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from MemeMind_LangChain.app.core.database import get_db
 from MemeMind_LangChain.app.core.exceptions import NotFoundException
+from MemeMind_LangChain.app.services.chunk_service import TextChunkService
+from MemeMind_LangChain.app.repository.chunk_repository import TextChunkRepository
 from MemeMind_LangChain.app.repository.doc_repository import SourceDocumentRepository
 from MemeMind_LangChain.app.schemas.param_schemas import DocumentQueryParams
 from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse
@@ -23,8 +25,18 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 
 # 文档服务依赖项
 def get_document_service(session:AsyncSession=Depends(get_db)) ->SourceDocumentService:
-    repository = SourceDocumentRepository(session=session) # 初始化文档仓库
-    return SourceDocumentService(repository=repository) # 返回文档服务实例
+    """
+    初始化文档服务依赖项，返回一个 SourceDocumentService 实例。
+
+    :param session: 数据库会话依赖项，用于与数据库交互。
+    :return: 配置好的 SourceDocumentService 实例。
+    """
+    doc_repo = SourceDocumentRepository(session)
+    chunk_repo = TextChunkRepository(session)
+    # 先创建底层的 chunk_service
+    chunk_service = TextChunkService(chunk_repo)
+    # 再创建依赖 chunk_service 的 doc_service
+    return SourceDocumentService(repository=doc_repo, chunk_service=chunk_service) # 返回文档服务实例
 
 @router.get(
     "/", response_model=SourceDocumentResponse,
