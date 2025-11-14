@@ -58,7 +58,7 @@ class BaseConfig(BaseSettings):
     RERANKER_MODEL_PATH: str = "local_models/reranker/bge-reranker-v2-m3"
 
     # LLM 模型 (Qwen)
-    LLM_MODEL_PATH: str = "local_models/llm/Qwen3-1.7B"
+    LLM_MODEL_PATH: str = "local_models/llm/Qwen2.5-1.5B-Instruct"
 
 
     EMBEDDING_DIMENSIONS: int = 1024  # 嵌入维度, Qwen 0.6B为1024 Qwen 4B为2560
