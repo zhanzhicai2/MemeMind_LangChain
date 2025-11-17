@@ -1,12 +1,12 @@
 # -*- coding: UTF-8 -*-
 """
-@File ：service.py
+@File ：chunk_service.py
 @IDE ：PyCharm
 @Author ：zhanzhicai
 @Date ：2025/11/4 18:12
-@DOC: 
+@DOC: 文本块服务层
 """
-from app.text_chunk.repository import TextChunkRepository
+from app.repository.chunk_repository import TextChunkRepository
 from app.schemas.schemas import TextChunkCreate, TextChunkResponse
 from loguru import logger
 
@@ -22,7 +22,7 @@ class TextChunkService:
         new_chunk = await self.repository.create(data)
         return TextChunkResponse.model_validate(new_chunk)
 
-    async def add_chunks_for_document(
+    async def add_chunks_in_bulk(
         self, chunks_data: list[TextChunkCreate]
     ) -> list[TextChunkResponse]:
         new_chunks = await self.repository.create_bulk(chunks_data)
@@ -33,6 +33,11 @@ class TextChunkService:
             return []
         chunks = await self.repository.get_by_ids(chunk_ids)
         return [TextChunkResponse.model_validate(chunk) for chunk in chunks]
+
+    async def get_chunk_ids_by_document_id(self, document_id: int) -> list[int]:
+        """根据文档ID获取所有文本块的ID列表"""
+        chunks = await self.repository.get_by_document_id(document_id)
+        return [chunk.id for chunk in chunks]
 
     async def get_document_chunks_for_display(
         self, document_id: int, limit: int = 1000, offset: int = 0

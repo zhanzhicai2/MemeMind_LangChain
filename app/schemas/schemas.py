@@ -22,7 +22,7 @@
 # 导入日期时间模块，用于处理时间戳字段
 from datetime import datetime
 from typing import Any
-import enum
+from app.models.models import StorageType, MessageAuthor
 
 # 导入Pydantic相关组件：
 # BaseModel: 所有Pydantic模式的基类
@@ -104,19 +104,9 @@ class UserUpdateSchema(BaseSchema):
 # 附件基础模式：定义附件数据的基本结构和验证规则
 # ===================================================================
 class SourceDocumentBase(BaseSchema):
-    # MinIO对象名称：字符串类型，必填字段
-    object_name: str = Field(
-        ...,  # 必填字段
-        max_length=512,  # 最大长度512个字符，支持复杂的对象路径
-        description="MinIO对象存储中的唯一标识符路径，例如：'documents/2024/report.pdf'"  # 详细描述
-    )
-
-    # MinIO存储桶名称：字符串类型，必填字段
-    bucket_name: str = Field(
-        ...,  # 必填字段
-        max_length=100,  # 最大长度100个字符
-        description="MinIO存储桶名称，例如：'mememind-documents'或'user-uploads'"  # 存储桶用途说明
-    )
+    # 文件存储路径：字符串类型，必填字段
+    file_path: str = Field(
+        ..., max_length=1024, description="文件存储路径 (本地路径或对象存储Key)")
 
     # 原始文件名：字符串类型，必填字段
     original_filename: str = Field(
@@ -162,6 +152,7 @@ class SourceDocumentResponse(SourceDocumentBase):
         ...,  # 必填字段
         description="数据库中的附件主键ID，用于唯一标识附件记录"  # ID用途说明
     )
+    storage_type: StorageType = Field(..., description="文件存储类型")
     status: str = Field(
         ...,
         description="文件状态"
@@ -210,8 +201,10 @@ class PresignedUrlResponse(BaseModel):
 class TextChunkBase(BaseSchema):
     """TextChunk 基础模型，包含通用字段。"""
     chunk_text: str = Field(..., description="文本块的实际内容") # 文本块的实际内容
-    sequence_in_document: int = Field(..., ge=0, description="文本块在原文档中的顺序编号，从0开始") # 文本块在原文档中的顺序编号，从0开始
-    metadata_json: dict[str, Any] | None = Field(None, description="与文本块相关的其他元数据，例如页码、章节等") # 与文本块相关的其他元数据，例如页码、章节等
+    sequence_in_document: int = Field(
+        ..., ge=0, description="文本块在原文档中的顺序编号，从0开始") # 文本块在原文档中的顺序编号，从0开始
+    metadata_json: dict[str, Any] | None = Field(
+        None, description="与文本块相关的其他元数据，例如页码、章节等") # 与文本块相关的其他元数据，例如页码、章节等
 # TextChunkCreate Pydantic Model 文本块创建模型
 class TextChunkCreate(TextChunkBase):
     """
@@ -248,11 +241,6 @@ class TextChunkResponse(TextChunkBase):
 #     Message 相关模型 (全新补充)
 # ===================================================================
 
-# 与 SQLAlchemy 模型中的 Enum 保持一致，用于数据验证
-class MessageAuthor(str, enum.Enum):
-    USER = "user"
-    BOT = "bot"
-
 # 基础模型，包含通用字段
 class MessageBase(BaseSchema):
     """
@@ -266,24 +254,24 @@ class MessageCreate(MessageBase):
     """
     用于在数据库中创建新 Message 记录的模型。
     """
-    response_to_id: int | None = Field(None, description="当作者是bot时，此字段指向对应用户消息的ID")
-    retrieved_chunk_ids: list[int] | None = Field(None,
-                                                  description="当作者是bot时，此字段存储用于生成回答的文本块ID列表")
-
-# 更新模型，包含更新时需要的字段
-class MessageUpdate(BaseSchema):
-    """
-    用于更新现有 Message 记录的模型 (非常规操作)。
-    通常聊天记录不应被修改。
-    """
-    content: str | None = Field(None, description="更新后的消息内容")
+    conversation_id: str = Field(..., description="对话的唯一ID")
+    response_to_id: int | None = Field(
+        None, description="当作者是bot时，此字段指向对应用户消息的ID"
+    )
+    retrieved_chunk_ids: list[int] | None = Field(
+        None, description="当作者是bot时，此字段存储用于生成回答的文本块ID列表"
+    )
 
 # 响应模型，包含从数据库读取的完整信息
 class MessageResponse(MessageBase):
     """
     用于 API 响应或内部数据表示的 Message 模型。
     """
-    id: int = Field(..., description="消息的唯一ID")
-    response_to_id: int | None = Field(None, description="如果此消息是回答，则为对应问题的ID")
-    retrieved_chunk_ids: list[int] | None = Field(None, description="用于生成此回答的上下文文本块ID")
+    conversation_id: str = Field(..., description="对话的唯一ID")
+    response_to_id: int | None = Field(
+        None, description="如果此消息是回答，则为对应问题的ID"
+    )
+    retrieved_chunk_ids: list[int] | None = Field(
+        None, description="用于生成此回答的上下文文本块ID"
+    )
     created_at: datetime = Field(..., description="消息创建时间")

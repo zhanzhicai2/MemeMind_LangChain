@@ -20,7 +20,7 @@ import sys
 from typing import Optional
 
 # 导入AWS客户端错误类，用于处理AWS相关服务的异常
-from botocore.exceptions import ClientError
+# from botocore.exceptions import ClientError
 # 导入SQLAlchemy异步会话类，用于数据库异步操作
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,7 +90,7 @@ def run_migrations() -> Optional[bool]:
         raise  # 重新抛出异常，让上层调用者处理
 
     # 捕获AWS客户端错误异常，处理MinIO或其他AWS服务相关的错误
-    except ClientError as e:
+    except Exception as e:
         print(f"运行时发生错误: {e}")  # 控制台输出错误信息
         logger.error(f"运行时发生错误: {e}")  # 记录错误到日志文件
         raise  # 重新抛出异常，让上层调用者处理
