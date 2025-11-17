@@ -8,9 +8,8 @@
 """
 import re
 from loguru import logger
-from langchain_community.retrievers import ContextualCompressionRetriever
+from langchain.retrievers import ContextualCompressionRetriever
 from langchain_core.documents import Document
-# from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.tracers import ConsoleCallbackHandler

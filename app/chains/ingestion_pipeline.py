@@ -13,14 +13,14 @@ from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from loguru import logger
 from langchain_core.documents import Document
-from MemeMind_LangChain.app.chains.vector_store import get_chroma_vector_store
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.database import create_engine_and_session_for_celery
-from MemeMind_LangChain.app.repository.doc_repository import SourceDocumentRepository
-from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate
-from MemeMind_LangChain.app.services.doc_service import SourceDocumentService
-from MemeMind_LangChain.app.repository.chunk_repository import TextChunkRepository
-from MemeMind_LangChain.app.services.chunk_service import TextChunkService
+from app.chains.vector_store import get_chroma_vector_store
+from app.core.config import settings
+from app.core.database import create_engine_and_session_for_celery
+from app.repository.doc_repository import SourceDocumentRepository
+from app.schemas.schemas import TextChunkCreate
+from app.services.doc_service import SourceDocumentService
+from app.repository.chunk_repository import TextChunkRepository
+from app.services.chunk_service import TextChunkService
 
 
 async def _load_docs(input_dict: dict) -> list[Document]:

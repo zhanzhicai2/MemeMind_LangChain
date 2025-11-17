@@ -17,14 +17,14 @@ from fastapi import HTTPException
 from loguru import logger
 from fastapi.responses import FileResponse
 
-from MemeMind_LangChain.app.core.celery_app import celery_app
-from MemeMind_LangChain.app.core.config import settings
-from MemeMind_LangChain.app.core.exceptions import NotFoundException
-from MemeMind_LangChain.app.models.models import StorageType
-from MemeMind_LangChain.app.repository.doc_repository import SourceDocumentRepository
-from MemeMind_LangChain.app.services.chunk_service import TextChunkService
-from MemeMind_LangChain.app.chains.vector_store import get_chroma_vector_store
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentCreate, SourceDocumentResponse, SourceDocumentUpdate
+from app.core.celery_app import celery_app
+from app.core.config import settings
+from app.core.exceptions import NotFoundException
+from app.models.models import StorageType
+from app.repository.doc_repository import SourceDocumentRepository
+from app.services.chunk_service import TextChunkService
+from app.chains.vector_store import get_chroma_vector_store
+from app.schemas.schemas import SourceDocumentCreate, SourceDocumentResponse, SourceDocumentUpdate
 
 
 class SourceDocumentService:

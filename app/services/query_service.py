@@ -7,7 +7,7 @@
 @DOC: 
 """
 from loguru import logger
-from MemeMind_LangChain.app.chains.qa_chain import create_rag_qa_chain
+from app.chains.qa_chain import create_rag_qa_chain
 
 
 class QueryService():

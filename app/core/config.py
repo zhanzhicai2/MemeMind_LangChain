@@ -51,14 +51,16 @@ class BaseConfig(BaseSettings):
     CHROMA_COLLECTION_NAME: str = "mememind_rag_collection"  # ChromaDB 集合名称
 
     # Embedding 模型相关
-    # Embedding 模型 (BAAI BGE)
-    EMBEDDING_MODEL_PATH: str = "local_models/embedding/bge-large-zh-v1.5"
+    # Embedding 模型 - 使用Qwen3-Embedding，因为它有safetensors格式，避免torch安全漏洞
+    # EMBEDDING_MODEL_PATH: str ="local_models/embedding/bge-large-zh-v1.5"
+    EMBEDDING_MODEL_PATH: str = "local_models/embedding/Qwen3-Embedding-0.6B"
 
     # Reranker 模型 (BAAI BGE)
     RERANKER_MODEL_PATH: str = "local_models/reranker/bge-reranker-v2-m3"
+    # RERANKER_MODEL_PATH: str = "local_models/reranker/Qwen3-Reranker-0.6B"
 
     # LLM 模型 (Qwen)
-    LLM_MODEL_PATH: str = "local_models/llm/Qwen2.5-1.5B-Instruct"
+    LLM_MODEL_PATH: str = "local_models/llm/Qwen3-4B"
 
 
     EMBEDDING_DIMENSIONS: int = 1024  # 嵌入维度, Qwen 0.6B为1024 Qwen 4B为2560

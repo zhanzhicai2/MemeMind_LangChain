@@ -11,8 +11,8 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
-from MemeMind_LangChain.app.chains.qa_chain import get_standalone_retriever
-from MemeMind_LangChain.app.services.query_service import QueryService
+from app.chains.qa_chain import get_standalone_retriever
+from app.services.query_service import QueryService
 
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
 

@@ -7,9 +7,10 @@
 @DOC: 加载 BAAI BGE Reranker 组件
 """
 from functools import lru_cache
+import torch
 
 from loguru import logger
-from langchain_community.retrievers import CrossEncoderReranker
+from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
 from app.core.config import settings
@@ -26,10 +27,18 @@ def get_bge_reranker() -> CrossEncoderReranker:
     logger.info("开始初始化 BAAI BGE Reranker 组件...")
 
     try:
+        # 暂时强制使用 CPU 模式，避免 meta tensor 问题
+        device = "cpu"
+        logger.info("为避免兼容性问题，强制使用 CPU 模式加载 BGE Reranker。")
+
         # 步骤 1: 加载 HuggingFace 模型
-        # model_kwargs 可以用来传递设备信息等，例如 {'device': 'cuda'}
+        # 简化配置，避免参数问题
         model = HuggingFaceCrossEncoder(
             model_name=settings.RERANKER_MODEL_PATH,  # 指向 "BAAI/bge-reranker-v2-m3"
+            model_kwargs={
+                "device": device,  # 明确指定设备为 CPU
+                "trust_remote_code": True,  # 信任远程代码
+            }
         )
 
         # 步骤 2: 将加载好的模型传递给通用的 CrossEncoderReranker 压缩器
@@ -41,4 +50,4 @@ def get_bge_reranker() -> CrossEncoderReranker:
 
     except Exception as e:
         logger.error(f"初始化 BAAI BGE Reranker 组件失败: {e}", exc_info=True)
-        raise
+        raise RuntimeError("BAAI BGE Reranker 组件初始化失败") from e

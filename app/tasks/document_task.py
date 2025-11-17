@@ -6,7 +6,7 @@ from app.tasks.utils.doc_process import _execute_document_processing_async
 from app.tasks.utils.query_process import execute_query_processing_async
 from app.core.enhanced_doc_processor import process_document_enhanced
 
-from MemeMind_LangChain.app.chains.ingestion_pipeline import run_ingestion_pipeline
+from app.chains.ingestion_pipeline import run_ingestion_pipeline
 
 
 # --- 文档处理任务 ---
@@ -76,16 +76,16 @@ def process_document_enhanced_task(self, document_id: int):
             exc_info=True,
         )
         # 重新抛出异常，这对于 Celery 至关重要
-        raise
+        raise # 重新抛出，让 Celery 将任务标记为 FAILED
     finally:
         # 5. 关键步骤：这个 finally 块中的代码保证【总是】会执行
         logger.info(f"{task_id_log_prefix} 开始清理异步环境，关闭事件循环。")
         loop.close()
 
 
-# --- 查询处理任务（暂时保持不变，我们稍后会重构它） ---
-@celery_app.task(name="app.tasks.document_task.process_query_task", bind=True)
-def process_query_task(self, message: dict):
-    # ... 你的旧查询逻辑暂时保留 ...
-    # 我们将在下一步重构这个部分
-    pass
+# # --- 查询处理任务（暂时保持不变，我们稍后会重构它） ---
+# @celery_app.task(name="app.tasks.document_task.process_query_task", bind=True)
+# def process_query_task(self, message: dict):
+#     # ... 你的旧查询逻辑暂时保留 ...
+#     # 我们将在下一步重构这个部分
+#     pass

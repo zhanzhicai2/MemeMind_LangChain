@@ -12,14 +12,14 @@ from fastapi import APIRouter, Depends, status, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from MemeMind_LangChain.app.core.database import get_db
-from MemeMind_LangChain.app.core.exceptions import NotFoundException
-from MemeMind_LangChain.app.services.chunk_service import TextChunkService
-from MemeMind_LangChain.app.repository.chunk_repository import TextChunkRepository
-from MemeMind_LangChain.app.repository.doc_repository import SourceDocumentRepository
-from MemeMind_LangChain.app.schemas.param_schemas import DocumentQueryParams
-from MemeMind_LangChain.app.schemas.schemas import SourceDocumentResponse
-from MemeMind_LangChain.app.services.doc_service import SourceDocumentService
+from app.core.database import get_db
+from app.core.exceptions import NotFoundException
+from app.services.chunk_service import TextChunkService
+from app.repository.chunk_repository import TextChunkRepository
+from app.repository.doc_repository import SourceDocumentRepository
+from app.schemas.param_schemas import DocumentQueryParams
+from app.schemas.schemas import SourceDocumentResponse
+from app.services.doc_service import SourceDocumentService
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -36,7 +36,7 @@ def get_document_service(session:AsyncSession=Depends(get_db)) ->SourceDocumentS
     # 先创建底层的 chunk_service
     chunk_service = TextChunkService(chunk_repo)
     # 再创建依赖 chunk_service 的 doc_service
-    return SourceDocumentService(repository=doc_repo, chunk_service=chunk_service) # 返回文档服务实例
+    return SourceDocumentService(doc_repository=doc_repo, chunk_service=chunk_service) # 返回文档服务实例
 
 @router.get(
     "/", response_model=SourceDocumentResponse,

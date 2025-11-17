@@ -6,8 +6,8 @@
 @Date ：2025/11/4 18:12
 @DOC: 文本块服务层
 """
-from MemeMind_LangChain.app.repository.chunk_repository import TextChunkRepository
-from MemeMind_LangChain.app.schemas.schemas import TextChunkCreate, TextChunkResponse
+from app.repository.chunk_repository import TextChunkRepository
+from app.schemas.schemas import TextChunkCreate, TextChunkResponse
 from loguru import logger
 
 

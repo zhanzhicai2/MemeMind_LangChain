@@ -12,8 +12,8 @@ import chromadb
 from langchain_chroma import Chroma
 from loguru import logger
 
-from MemeMind_LangChain.app.chains.embedding_loader import get_bge_embeddings
-from MemeMind_LangChain.app.core.config import settings
+from app.chains.embedding_loader import get_qwen3_embeddings
+from app.core.config import settings
 
 # 注意：由于我们的工厂函数将变为异步，lru_cache不再适用。
 # 在FastAPI中，我们通常通过依赖注入系统来管理单例实例的生命周期，
@@ -45,7 +45,7 @@ def get_chroma_vector_store() -> Chroma:
         chroma_client = chromadb.HttpClient(host=host, port=port)
         # --- 3. 获取嵌入函数 ---
         # 这是关键，VectorStore 需要知道用什么模型来处理文本
-        embedding_function = get_bge_embeddings()
+        embedding_function = get_qwen3_embeddings()
 
         # --- 4. 创建 LangChain 的 Chroma 实例 ---
         # 这个实例就是我们可以直接在 LangChain 流水线中使用的标准组件
